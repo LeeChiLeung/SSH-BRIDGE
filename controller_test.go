@@ -125,6 +125,13 @@ func TestWebServerBuildProfileViewsUsesProfileSnapshots(t *testing.T) {
 		State:     TunnelStateConnected,
 		Endpoint:  "127.0.0.1:3180",
 		Health:    TunnelHealth{ListenerReady: true, SSHConnected: true},
+		Traffic: TrafficStats{
+			UploadBytesPerSec:   1024,
+			DownloadBytesPerSec: 2048,
+			UploadBytesTotal:    4096,
+			DownloadBytesTotal:  8192,
+			ActiveConnections:   1,
+		},
 	}
 	controller.snapshots["two"] = &TunnelSnapshot{
 		ProfileID: "two",
@@ -132,6 +139,13 @@ func TestWebServerBuildProfileViewsUsesProfileSnapshots(t *testing.T) {
 		Endpoint:  "127.0.0.1:4180",
 		Health:    TunnelHealth{ListenerReady: true, SSHConnected: false},
 		LastError: "network timeout",
+		Traffic: TrafficStats{
+			UploadBytesPerSec:   0,
+			DownloadBytesPerSec: 512,
+			UploadBytesTotal:    128,
+			DownloadBytesTotal:  2048,
+			ActiveConnections:   0,
+		},
 	}
 	controller.mu.Unlock()
 
@@ -153,6 +167,70 @@ func TestWebServerBuildProfileViewsUsesProfileSnapshots(t *testing.T) {
 	}
 	if got := viewMap[profileTwo.ID].LastError; got != "network timeout" {
 		t.Fatalf("profile two last error = %q", got)
+	}
+	if got := viewMap[profileOne.ID].Traffic.ActiveConnections; got != 1 {
+		t.Fatalf("profile one active connections = %d, want 1", got)
+	}
+	if got := viewMap[profileTwo.ID].Traffic.DownloadBytesPerSec; got != 512 {
+		t.Fatalf("profile two down rate = %d, want 512", got)
+	}
+}
+
+func TestTunnelControllerTracksTrafficMetrics(t *testing.T) {
+	t.Parallel()
+
+	sshAddr, closeSSH := startTestSSHServer(t, "secret")
+	defer closeSSH()
+
+	mirrorAddr, closeMirror := startMirrorServer(t)
+	defer closeMirror()
+
+	controller := NewTunnelController(log.New(io.Discard, "", 0), newTestProfileStore(t))
+	defer controller.StopAll()
+
+	cfg := testTunnelConfig(sshAddr, mirrorAddr, "secret")
+	if err := controller.Start("traffic", cfg); err != nil {
+		t.Fatalf("start traffic: %v", err)
+	}
+	waitForState(t, controller, "traffic", TunnelStateConnected)
+
+	conn, err := net.DialTimeout("tcp", controller.Snapshot("traffic").Endpoint, 2*time.Second)
+	if err != nil {
+		t.Fatalf("dial traffic endpoint: %v", err)
+	}
+
+	payload := []byte(strings.Repeat("x", 4096))
+	readDone := make(chan struct{})
+	go func() {
+		defer close(readDone)
+		buf := make([]byte, len(payload))
+		for i := 0; i < 12; i++ {
+			if _, err := io.ReadFull(conn, buf); err != nil {
+				return
+			}
+		}
+	}()
+
+	for i := 0; i < 12; i++ {
+		if _, err := conn.Write(payload); err != nil {
+			t.Fatalf("write payload: %v", err)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	waitForActiveConnections(t, controller, "traffic", 1)
+	waitForTrafficBytes(t, controller, "traffic", uint64(len(payload))*12)
+	waitForTrafficRate(t, controller, "traffic")
+
+	_ = conn.Close()
+	<-readDone
+
+	waitForActiveConnections(t, controller, "traffic", 0)
+	waitForZeroTrafficRate(t, controller, "traffic")
+
+	snapshot := controller.Snapshot("traffic")
+	if snapshot.Traffic.UploadBytesTotal == 0 || snapshot.Traffic.DownloadBytesTotal == 0 {
+		t.Fatalf("traffic totals not recorded: %+v", snapshot.Traffic)
 	}
 }
 
@@ -176,6 +254,57 @@ func waitForState(t *testing.T, controller *TunnelController, profileID string, 
 	}
 	snapshot := controller.Snapshot(profileID)
 	t.Fatalf("profile %s state = %s, want %s, last error = %q", profileID, snapshot.State, want, snapshot.LastError)
+}
+
+func waitForActiveConnections(t *testing.T, controller *TunnelController, profileID string, want int64) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if controller.Snapshot(profileID).Traffic.ActiveConnections == want {
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	t.Fatalf("profile %s active connections = %d, want %d", profileID, controller.Snapshot(profileID).Traffic.ActiveConnections, want)
+}
+
+func waitForTrafficBytes(t *testing.T, controller *TunnelController, profileID string, minimum uint64) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		snapshot := controller.Snapshot(profileID)
+		if snapshot.Traffic.UploadBytesTotal >= minimum && snapshot.Traffic.DownloadBytesTotal >= minimum {
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	t.Fatalf("profile %s traffic totals too small: %+v", profileID, controller.Snapshot(profileID).Traffic)
+}
+
+func waitForTrafficRate(t *testing.T, controller *TunnelController, profileID string) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		snapshot := controller.Snapshot(profileID)
+		if snapshot.Traffic.UploadBytesPerSec > 0 && snapshot.Traffic.DownloadBytesPerSec > 0 {
+			return
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	t.Fatalf("profile %s traffic rates not observed: %+v", profileID, controller.Snapshot(profileID).Traffic)
+}
+
+func waitForZeroTrafficRate(t *testing.T, controller *TunnelController, profileID string) {
+	t.Helper()
+	deadline := time.Now().Add(4 * time.Second)
+	for time.Now().Before(deadline) {
+		snapshot := controller.Snapshot(profileID)
+		if snapshot.Traffic.UploadBytesPerSec == 0 && snapshot.Traffic.DownloadBytesPerSec == 0 {
+			return
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	t.Fatalf("profile %s traffic rates did not return to zero: %+v", profileID, controller.Snapshot(profileID).Traffic)
 }
 
 func assertForwarding(t *testing.T, endpoint string, want string) {
@@ -256,6 +385,34 @@ func startEchoServer(t *testing.T, reply string) (string, func()) {
 				buf := make([]byte, 4)
 				_, _ = io.ReadFull(c, buf)
 				_, _ = c.Write([]byte(reply))
+			}(conn)
+		}
+	}()
+
+	return listener.Addr().String(), func() {
+		_ = listener.Close()
+		<-done
+	}
+}
+
+func startMirrorServer(t *testing.T) (string, func()) {
+	t.Helper()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen mirror: %v", err)
+	}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			go func(c net.Conn) {
+				defer c.Close()
+				_, _ = io.Copy(c, c)
 			}(conn)
 		}
 	}()

@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/crypto/ssh"
@@ -36,13 +37,92 @@ type LogEntry struct {
 	Message string    `json:"message"`
 }
 
+type TrafficStats struct {
+	UploadBytesTotal    uint64 `json:"uploadBytesTotal"`
+	DownloadBytesTotal  uint64 `json:"downloadBytesTotal"`
+	UploadBytesPerSec   uint64 `json:"uploadBytesPerSec"`
+	DownloadBytesPerSec uint64 `json:"downloadBytesPerSec"`
+	ActiveConnections   int64  `json:"activeConnections"`
+}
+
 type TunnelSnapshot struct {
 	ProfileID string       `json:"profileId"`
 	State     TunnelState  `json:"state"`
 	Endpoint  string       `json:"endpoint"`
 	Health    TunnelHealth `json:"health"`
 	LastError string       `json:"lastError"`
+	Traffic   TrafficStats `json:"traffic"`
 	Logs      []LogEntry   `json:"logs"`
+}
+
+type trafficMetrics struct {
+	uploadTotal   atomic.Uint64
+	downloadTotal atomic.Uint64
+	uploadBPS     atomic.Uint64
+	downloadBPS   atomic.Uint64
+	active        atomic.Int64
+}
+
+func (m *trafficMetrics) AddUpload(n int) {
+	if n > 0 {
+		m.uploadTotal.Add(uint64(n))
+	}
+}
+
+func (m *trafficMetrics) AddDownload(n int) {
+	if n > 0 {
+		m.downloadTotal.Add(uint64(n))
+	}
+}
+
+func (m *trafficMetrics) IncActive() {
+	m.active.Add(1)
+}
+
+func (m *trafficMetrics) DecActive() {
+	m.active.Add(-1)
+}
+
+func (m *trafficMetrics) ResetRates() {
+	m.uploadBPS.Store(0)
+	m.downloadBPS.Store(0)
+}
+
+func (m *trafficMetrics) ResetLive() {
+	m.ResetRates()
+	m.active.Store(0)
+}
+
+func (m *trafficMetrics) Snapshot() TrafficStats {
+	return TrafficStats{
+		UploadBytesTotal:    m.uploadTotal.Load(),
+		DownloadBytesTotal:  m.downloadTotal.Load(),
+		UploadBytesPerSec:   m.uploadBPS.Load(),
+		DownloadBytesPerSec: m.downloadBPS.Load(),
+		ActiveConnections:   m.active.Load(),
+	}
+}
+
+func (m *trafficMetrics) sampleLoop(ctx context.Context) {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+
+	prevUpload := m.uploadTotal.Load()
+	prevDownload := m.downloadTotal.Load()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			currentUpload := m.uploadTotal.Load()
+			currentDownload := m.downloadTotal.Load()
+			m.uploadBPS.Store(currentUpload - prevUpload)
+			m.downloadBPS.Store(currentDownload - prevDownload)
+			prevUpload = currentUpload
+			prevDownload = currentDownload
+		}
+	}
 }
 
 type sessionStore struct {
@@ -126,6 +206,7 @@ type tunnelRun struct {
 	listener  net.Listener
 	tracker   *tunnelTracker
 	sessions  *sessionStore
+	traffic   *trafficMetrics
 }
 
 type TunnelController struct {
@@ -175,6 +256,7 @@ func (c *TunnelController) start(profileID string, cfg TunnelConfig, listener ne
 		listener:  listener,
 		tracker:   newTunnelTracker(),
 		sessions:  &sessionStore{},
+		traffic:   &trafficMetrics{},
 	}
 
 	c.mu.Lock()
@@ -184,6 +266,7 @@ func (c *TunnelController) start(profileID string, cfg TunnelConfig, listener ne
 	snapshot.Endpoint = cfg.LocalEndpoint()
 	snapshot.Health = TunnelHealth{}
 	snapshot.LastError = ""
+	snapshot.Traffic = TrafficStats{}
 	c.mu.Unlock()
 
 	go c.executeRun(run)
@@ -197,6 +280,9 @@ func (c *TunnelController) Stop(profileID string) {
 		snapshot := c.snapshotLocked(profileID)
 		snapshot.State = TunnelStateDisconnected
 		snapshot.Health = TunnelHealth{}
+		snapshot.Traffic.UploadBytesPerSec = 0
+		snapshot.Traffic.DownloadBytesPerSec = 0
+		snapshot.Traffic.ActiveConnections = 0
 		c.mu.Unlock()
 		return
 	}
@@ -229,7 +315,11 @@ func (c *TunnelController) Snapshot(profileID string) TunnelSnapshot {
 	if !ok {
 		return TunnelSnapshot{ProfileID: profileID, State: TunnelStateDisconnected}
 	}
-	return cloneSnapshot(snapshot)
+	cloned := cloneSnapshot(snapshot)
+	if run := c.runs[profileID]; run != nil {
+		cloned.Traffic = run.traffic.Snapshot()
+	}
+	return cloned
 }
 
 func (c *TunnelController) Snapshots() map[string]TunnelSnapshot {
@@ -238,7 +328,11 @@ func (c *TunnelController) Snapshots() map[string]TunnelSnapshot {
 
 	out := make(map[string]TunnelSnapshot, len(c.snapshots))
 	for profileID, snapshot := range c.snapshots {
-		out[profileID] = cloneSnapshot(snapshot)
+		cloned := cloneSnapshot(snapshot)
+		if run := c.runs[profileID]; run != nil {
+			cloned.Traffic = run.traffic.Snapshot()
+		}
+		out[profileID] = cloned
 	}
 	return out
 }
@@ -255,6 +349,7 @@ func cloneSnapshot(snapshot *TunnelSnapshot) TunnelSnapshot {
 		Endpoint:  snapshot.Endpoint,
 		Health:    snapshot.Health,
 		LastError: snapshot.LastError,
+		Traffic:   snapshot.Traffic,
 		Logs:      logs,
 	}
 }
@@ -285,6 +380,8 @@ func (c *TunnelController) detachRun(profileID string) *tunnelRun {
 func (c *TunnelController) executeRun(run *tunnelRun) {
 	defer close(run.done)
 	defer c.finalizeRun(run)
+
+	go run.traffic.sampleLoop(run.ctx)
 
 	if run.listener == nil {
 		listener, err := net.Listen("tcp", run.cfg.LocalEndpoint())
@@ -368,6 +465,7 @@ func (c *TunnelController) executeRun(run *tunnelRun) {
 			run.sessions.Clear(client)
 			_ = client.Close()
 			run.tracker.CloseAll()
+			run.traffic.ResetRates()
 			c.setSSHHealth(run.profileID, false)
 			c.setLastError(run.profileID, err.Error())
 			c.setState(run.profileID, TunnelStateRetrying)
@@ -387,9 +485,11 @@ func (c *TunnelController) finalizeRun(run *tunnelRun) {
 	if current == run {
 		delete(c.runs, run.profileID)
 	}
+	run.traffic.ResetLive()
 	snapshot := c.snapshotLocked(run.profileID)
 	snapshot.State = TunnelStateDisconnected
 	snapshot.Health = TunnelHealth{}
+	snapshot.Traffic = run.traffic.Snapshot()
 }
 
 func (c *TunnelController) logf(profileID string, format string, args ...any) {
@@ -671,23 +771,61 @@ func handleLocalConn(
 
 	tunnel := &trackedTunnel{local: local, remote: remote}
 	tracker.Add(tunnel)
+	runTraffic := controller.lookupTraffic(profileID)
+	if runTraffic != nil {
+		runTraffic.IncActive()
+	}
 	defer func() {
 		tunnel.Close()
 		tracker.Remove(tunnel)
+		if runTraffic != nil {
+			runTraffic.DecActive()
+		}
 	}()
 
 	copyDone := make(chan struct{}, 2)
-	go proxy(local, remote, copyDone)
-	go proxy(remote, local, copyDone)
+	go proxy(local, remote, copyDone, func(n int) {
+		if runTraffic != nil {
+			runTraffic.AddUpload(n)
+		}
+	})
+	go proxy(remote, local, copyDone, func(n int) {
+		if runTraffic != nil {
+			runTraffic.AddDownload(n)
+		}
+	})
 
 	<-copyDone
 	tunnel.Close()
 	<-copyDone
 }
 
-func proxy(src net.Conn, dst net.Conn, done chan<- struct{}) {
+func (c *TunnelController) lookupTraffic(profileID string) *trafficMetrics {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	run := c.runs[profileID]
+	if run == nil {
+		return nil
+	}
+	return run.traffic
+}
+
+type countingReader struct {
+	reader  io.Reader
+	observe func(int)
+}
+
+func (r *countingReader) Read(p []byte) (int, error) {
+	n, err := r.reader.Read(p)
+	if n > 0 && r.observe != nil {
+		r.observe(n)
+	}
+	return n, err
+}
+
+func proxy(src net.Conn, dst net.Conn, done chan<- struct{}, observe func(int)) {
 	defer func() { done <- struct{}{} }()
-	_, _ = io.Copy(dst, src)
+	_, _ = io.Copy(dst, &countingReader{reader: src, observe: observe})
 	closeWrite(dst)
 	closeRead(src)
 }

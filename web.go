@@ -17,6 +17,7 @@ type profileView struct {
 	State         TunnelState
 	Endpoint      string
 	Health        TunnelHealth
+	Traffic       TrafficStats
 	LastError     string
 	IsActive      bool
 	LocalPortText string
@@ -61,7 +62,9 @@ type WebServer struct {
 
 func NewWebServer(addr string, controller *TunnelController, store *ProfileStore, logger *log.Logger) (*WebServer, error) {
 	tpls, err := template.New("page").Funcs(template.FuncMap{
-		"formatTime": formatTime,
+		"formatTime":  formatTime,
+		"formatBytes": formatBytes,
+		"formatRate":  formatRate,
 		"statusLabel": func(state TunnelState) string {
 			switch state {
 			case TunnelStateConnected:
@@ -336,6 +339,7 @@ func (s *WebServer) buildProfileViews() []profileView {
 		if snapshot, ok := snapshots[profile.ID]; ok {
 			view.State = snapshot.State
 			view.Health = snapshot.Health
+			view.Traffic = snapshot.Traffic
 			view.LastError = snapshot.LastError
 			view.IsActive = snapshot.State != TunnelStateDisconnected || snapshot.LastError != ""
 			if snapshot.Endpoint != "" {
@@ -377,6 +381,7 @@ func (s *WebServer) buildDiagnostics(profile Profile) diagnosticsView {
 	if snapshot.State != "" {
 		view.State = snapshot.State
 		view.Health = snapshot.Health
+		view.Traffic = snapshot.Traffic
 		view.LastError = snapshot.LastError
 		view.IsActive = snapshot.State != TunnelStateDisconnected || snapshot.LastError != ""
 		if snapshot.Endpoint != "" {
@@ -440,6 +445,24 @@ func formatTime(ts *time.Time) string {
 		return "未启用"
 	}
 	return ts.Local().Format("2006-01-02 15:04:05")
+}
+
+func formatBytes(value uint64) string {
+	units := []string{"B", "KB", "MB", "GB", "TB"}
+	size := float64(value)
+	unit := units[0]
+	for idx := 0; idx < len(units)-1 && size >= 1024; idx++ {
+		size /= 1024
+		unit = units[idx+1]
+	}
+	if unit == "B" {
+		return fmt.Sprintf("%d %s", value, unit)
+	}
+	return fmt.Sprintf("%.1f %s", size, unit)
+}
+
+func formatRate(value uint64) string {
+	return formatBytes(value) + "/s"
 }
 
 func ptrSnapshot(snapshot TunnelSnapshot) *TunnelSnapshot {
@@ -702,6 +725,15 @@ const webTemplates = `
               <span>监听 {{if .Health.ListenerReady}}在线{{else}}离线{{end}}</span>
               <span>SSH {{if .Health.SSHConnected}}在线{{else}}离线{{end}}</span>
             </div>
+            <div class="health">
+              <span>上行 {{formatRate .Traffic.UploadBytesPerSec}}</span>
+              <span>下行 {{formatRate .Traffic.DownloadBytesPerSec}}</span>
+            </div>
+            <div class="health">
+              <span>累计上行 {{formatBytes .Traffic.UploadBytesTotal}}</span>
+              <span>累计下行 {{formatBytes .Traffic.DownloadBytesTotal}}</span>
+              <span>连接 {{.Traffic.ActiveConnections}}</span>
+            </div>
             {{if .LastError}}<div class="error">{{.LastError}}</div>{{end}}
           </div>
         </section>
@@ -773,6 +805,15 @@ const webTemplates = `
             <span>监听 {{if .View.Health.ListenerReady}}在线{{else}}离线{{end}}</span>
             <span>SSH {{if .View.Health.SSHConnected}}在线{{else}}离线{{end}}</span>
           </div>
+          <div class="health">
+            <span>当前上行 {{formatRate .View.Traffic.UploadBytesPerSec}}</span>
+            <span>当前下行 {{formatRate .View.Traffic.DownloadBytesPerSec}}</span>
+          </div>
+          <div class="health">
+            <span>累计上行 {{formatBytes .View.Traffic.UploadBytesTotal}}</span>
+            <span>累计下行 {{formatBytes .View.Traffic.DownloadBytesTotal}}</span>
+            <span>活跃连接 {{.View.Traffic.ActiveConnections}}</span>
+          </div>
           {{if .View.LastError}}<div class="error">{{.View.LastError}}</div>{{end}}
         </div>
       </section>
@@ -790,6 +831,11 @@ const webTemplates = `
   <div class="health" style="margin-bottom:14px;">
     <span>启用时间 {{formatTime .View.Profile.LastEnabledAt}}</span>
     <span>当前入口 {{.View.Endpoint}}</span>
+    <span>上行速度 {{formatRate .View.Traffic.UploadBytesPerSec}}</span>
+    <span>下行速度 {{formatRate .View.Traffic.DownloadBytesPerSec}}</span>
+    <span>累计上行 {{formatBytes .View.Traffic.UploadBytesTotal}}</span>
+    <span>累计下行 {{formatBytes .View.Traffic.DownloadBytesTotal}}</span>
+    <span>活跃连接 {{.View.Traffic.ActiveConnections}}</span>
   </div>
   <div class="logs">
     {{if .Logs}}
