@@ -32,21 +32,21 @@
 
 ```bash
 go run . \
-  --ssh-host 8.138.105.156 \
-  --ssh-port 7659 \
-  --ssh-user root \
-  --ssh-key ~/.ssh/id_rsa \
+  --ssh-host ssh.example.com \
+  --ssh-port 22 \
+  --ssh-user user \
+  --ssh-key ~/.ssh/example_id_rsa \
   --insecure-ignore-host-key \
   --local-addr 127.0.0.1 \
-  --local-port 3180 \
+  --local-port 15432 \
   --remote-host 127.0.0.1 \
-  --remote-port 7897
+  --remote-port 5432
 ```
 
 这等价于类似下面这条 SSH 命令：
 
 ```bash
-ssh -p 7659 -N -C -L 127.0.0.1:3180:127.0.0.1:7897 root@8.138.105.156
+ssh -p 22 -N -C -L 127.0.0.1:15432:127.0.0.1:5432 user@ssh.example.com
 ```
 
 查看版本：
@@ -86,7 +86,7 @@ go run . \
   --ssh-host ssh.example.com \
   --ssh-port 22 \
   --ssh-user user \
-  --ssh-key ~/.ssh/id_rsa \
+  --ssh-key ~/.ssh/example_id_rsa \
   --remote-host 127.0.0.1 \
   --remote-port 5432 \
   --local-addr 127.0.0.1 \
@@ -101,7 +101,7 @@ go run . \
 eval "$(go run . \
   --ssh-host ssh.example.com \
   --ssh-user user \
-  --ssh-key ~/.ssh/id_rsa \
+  --ssh-key ~/.ssh/example_id_rsa \
   --local-port 0 \
   --env)"
 ```
