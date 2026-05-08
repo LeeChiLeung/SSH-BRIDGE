@@ -1,0 +1,30 @@
+package viewmodel
+
+type HomePageData struct {
+	Title          string
+	Version        string
+	Lang           string
+	HomeURL        string
+	NewURL         string
+	LegacyURL      string
+	Cards          []ProfileCard
+	FormModal      *FormPageData
+	SelectedDetail *DetailPageData
+}
+
+type ProfileCard struct {
+	Lang            string
+	Title           string
+	SSHAddress      string
+	LocalEndpoint   string
+	RemoteTarget    string
+	LastEnabledText string
+	StateLabel      string
+	DetailURL       string
+	StartURL        string
+	StopURL         string
+	CanStart        bool
+	CanStop         bool
+	RedirectURL     string
+	Selected        bool
+}

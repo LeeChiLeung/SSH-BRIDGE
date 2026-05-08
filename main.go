@@ -20,6 +20,7 @@ type cliOptions struct {
 	ChildMode   bool
 	ListenerFD  int
 	WebMode     bool
+	WebNewMode  bool
 	TrayMode    bool
 	WebAddr     string
 	VersionMode bool
@@ -42,6 +43,13 @@ func main() {
 	if opts.WebMode {
 		if err := runWebMode(opts, logger); err != nil {
 			logger.Printf("web console exited with error: %v", err)
+			os.Exit(1)
+		}
+		return
+	}
+	if opts.WebNewMode {
+		if err := runNewWebMode(opts, logger); err != nil {
+			logger.Printf("new web console exited with error: %v", err)
 			os.Exit(1)
 		}
 		return
@@ -85,7 +93,8 @@ func parseCLI() (cliOptions, error) {
 	flag.BoolVar(&opts.EnvMode, "env", false, "Print export command and keep the tunnel running in the background")
 	flag.BoolVar(&opts.ChildMode, "child", false, "Internal flag used by --env mode")
 	flag.IntVar(&opts.ListenerFD, "listener-fd", 0, "Internal file descriptor used by --env mode")
-	flag.BoolVar(&opts.WebMode, "web", false, "Run the local Web control console instead of starting the tunnel directly")
+	flag.BoolVar(&opts.WebMode, "web", false, "Run the legacy local Web control console instead of starting the tunnel directly")
+	flag.BoolVar(&opts.WebNewMode, "web-new", false, "Run the new chi+templ local Web control console")
 	flag.BoolVar(&opts.TrayMode, "tray", false, "Run the local Web control console with a system tray entry")
 	flag.StringVar(&opts.WebAddr, "web-addr", defaultWebAddr, "Local Web console listen address")
 	flag.BoolVar(&opts.VersionMode, "version", false, "Print version information and exit")
@@ -111,7 +120,7 @@ func parseCLI() (cliOptions, error) {
 	if opts.VersionMode {
 		return opts, nil
 	}
-	if opts.WebMode || opts.TrayMode {
+	if opts.WebMode || opts.WebNewMode || opts.TrayMode {
 		if opts.WebAddr == "" {
 			return opts, fmt.Errorf("web listen address is required")
 		}
@@ -155,6 +164,10 @@ func runTunnelMode(opts cliOptions, logger *log.Logger) error {
 
 func runWebMode(opts cliOptions, logger *log.Logger) error {
 	return runManagedWebMode(opts, logger, nil)
+}
+
+func runNewWebMode(opts cliOptions, logger *log.Logger) error {
+	return runManagedNewWebMode(opts, logger, nil)
 }
 
 func runTrayMode(opts cliOptions, logger *log.Logger) error {
@@ -216,8 +229,12 @@ func runTrayMode(opts cliOptions, logger *log.Logger) error {
 }
 
 type managedWebMode struct {
-	server  *WebServer
+	server  webRunner
 	webAddr string
+}
+
+type webRunner interface {
+	Run(ctx context.Context) error
 }
 
 func (m *managedWebMode) webURL() string {
@@ -241,8 +258,35 @@ func newManagedWebMode(opts cliOptions, logger *log.Logger) (*managedWebMode, er
 	return &managedWebMode{server: server, webAddr: opts.WebAddr}, nil
 }
 
+func newManagedNewWebMode(opts cliOptions, logger *log.Logger) (*managedWebMode, error) {
+	store, err := NewProfileStore(defaultProfileStorePath())
+	if err != nil {
+		return nil, err
+	}
+	if _, err := store.EnsureDefault(opts.TunnelConfig); err != nil {
+		return nil, err
+	}
+
+	controller := NewTunnelController(logger, store)
+	server := NewTemplWebServer(opts.WebAddr, newUIRouter(controller, store, ""))
+	return &managedWebMode{server: server, webAddr: opts.WebAddr}, nil
+}
+
 func runManagedWebMode(opts cliOptions, logger *log.Logger, ctx context.Context) error {
 	managed, err := newManagedWebMode(opts, logger)
+	if err != nil {
+		return err
+	}
+	if ctx == nil {
+		var stop context.CancelFunc
+		ctx, stop = signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+		defer stop()
+	}
+	return managed.server.Run(ctx)
+}
+
+func runManagedNewWebMode(opts cliOptions, logger *log.Logger, ctx context.Context) error {
+	managed, err := newManagedNewWebMode(opts, logger)
 	if err != nil {
 		return err
 	}
