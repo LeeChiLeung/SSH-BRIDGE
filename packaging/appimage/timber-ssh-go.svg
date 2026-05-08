@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Timber SSH Go">
+  <rect width="128" height="128" rx="24" fill="#0f172a"/>
+  <path d="M24 36h80v56H24z" fill="#e2e8f0"/>
+  <path d="M34 46h60v36H34z" fill="#0f766e"/>
+  <path d="M42 64l10-10 4 4-6 6 6 6-4 4zm28 6h16v-4H70zm0-12h16v-4H70z" fill="#f8fafc"/>
+</svg>
