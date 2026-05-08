@@ -35,6 +35,7 @@ type detailPanelData struct {
 	View        profileView
 	Diagnostics diagnosticsView
 	FormAction  string
+	CancelURL   string
 }
 
 type indexPageData struct {
@@ -92,6 +93,7 @@ func (s *WebServer) Run(ctx context.Context) error {
 	mux.HandleFunc("/", s.handleIndex)
 	mux.HandleFunc("/cards", s.handleCards)
 	mux.HandleFunc("/profiles/new", s.handleNewProfile)
+	mux.HandleFunc("/profiles/default/detail", s.handleDefaultDetail)
 	mux.HandleFunc("/profiles/save", s.handleSaveProfile)
 	mux.HandleFunc("/profiles/", s.handleProfileRoute)
 	mux.HandleFunc("/api/status", s.handleAPIStatus)
@@ -142,7 +144,12 @@ func (s *WebServer) handleNewProfile(w http.ResponseWriter, r *http.Request) {
 		Mode:       "form",
 		Profile:    profile,
 		FormAction: "/profiles/save",
+		CancelURL:  "/profiles/default/detail",
 	})
+}
+
+func (s *WebServer) handleDefaultDetail(w http.ResponseWriter, r *http.Request) {
+	s.render(w, "detailPanel", s.defaultDetail(s.buildProfileViews()))
 }
 
 func (s *WebServer) handleSaveProfile(w http.ResponseWriter, r *http.Request) {
@@ -179,6 +186,7 @@ func (s *WebServer) handleProfileRoute(w http.ResponseWriter, r *http.Request) {
 			Mode:       "form",
 			Profile:    profile,
 			FormAction: "/profiles/save",
+			CancelURL:  "/profiles/" + profile.ID + "/detail",
 		})
 	case "detail":
 		profile, ok := s.store.Get(id)
@@ -230,6 +238,7 @@ func (s *WebServer) handleProfileRoute(w http.ResponseWriter, r *http.Request) {
 			Mode:       "form",
 			Profile:    profile,
 			FormAction: "/profiles/save",
+			CancelURL:  "/profiles/" + profile.ID + "/detail",
 		})
 	case "delete":
 		if r.Method != http.MethodPost {
@@ -367,6 +376,7 @@ func (s *WebServer) profileDetail(profile Profile) detailPanelData {
 		Profile:     profile,
 		View:        diagnostics.View,
 		Diagnostics: diagnostics,
+		CancelURL:   "/profiles/" + profile.ID + "/detail",
 	}
 }
 
@@ -797,7 +807,7 @@ const webTemplates = `
         <div class="form-field full"><label><input type="checkbox" name="insecure_ignore_host" {{if .Profile.InsecureIgnoreHost}}checked{{end}}> 忽略 Host Key 校验</label></div>
       </div>
       <div class="form-actions">
-        <button type="button" class="btn ghost" data-load-url="/profiles/{{.Profile.ID}}/detail" data-target="#detail-panel">取消</button>
+        <button type="button" class="btn ghost" data-load-url="{{.CancelURL}}" data-target="#detail-panel">取消</button>
         <button type="submit" class="btn submit">保存</button>
       </div>
     </form>
