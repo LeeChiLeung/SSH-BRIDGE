@@ -43,11 +43,12 @@ type indexPageData struct {
 }
 
 type apiResponse struct {
-	OK       bool            `json:"ok"`
-	Message  string          `json:"message,omitempty"`
-	Profile  *Profile        `json:"profile,omitempty"`
-	Profiles []Profile       `json:"profiles,omitempty"`
-	Status   *TunnelSnapshot `json:"status,omitempty"`
+	OK       bool                      `json:"ok"`
+	Message  string                    `json:"message,omitempty"`
+	Profile  *Profile                  `json:"profile,omitempty"`
+	Profiles []Profile                 `json:"profiles,omitempty"`
+	Status   *TunnelSnapshot           `json:"status,omitempty"`
+	Statuses map[string]TunnelSnapshot `json:"statuses,omitempty"`
 }
 
 type WebServer struct {
@@ -208,7 +209,7 @@ func (s *WebServer) handleProfileRoute(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-		s.controller.Stop()
+		s.controller.Stop(id)
 		s.render(w, "cardsPanel", s.buildProfileViews())
 	case "duplicate":
 		if r.Method != http.MethodPost {
@@ -230,8 +231,8 @@ func (s *WebServer) handleProfileRoute(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-		snapshot := s.controller.Snapshot()
-		if snapshot.ActiveProfileID == id && snapshot.State != TunnelStateDisconnected {
+		snapshot := s.controller.Snapshot(id)
+		if snapshot.State != TunnelStateDisconnected {
 			http.Error(w, "cannot delete a running profile", http.StatusBadRequest)
 			return
 		}
@@ -246,7 +247,7 @@ func (s *WebServer) handleProfileRoute(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *WebServer) handleAPIStatus(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, apiResponse{OK: true, Status: ptrSnapshot(s.controller.Snapshot())})
+	writeJSON(w, http.StatusOK, apiResponse{OK: true, Statuses: s.controller.Snapshots()})
 }
 
 func (s *WebServer) handleAPIProfiles(w http.ResponseWriter, r *http.Request) {
@@ -290,10 +291,10 @@ func (s *WebServer) handleAPIProfileRoute(w http.ResponseWriter, r *http.Request
 			writeJSON(w, http.StatusBadRequest, apiResponse{OK: false, Message: err.Error()})
 			return
 		}
-		writeJSON(w, http.StatusOK, apiResponse{OK: true, Status: ptrSnapshot(s.controller.Snapshot())})
+		writeJSON(w, http.StatusOK, apiResponse{OK: true, Status: ptrSnapshot(s.controller.Snapshot(id))})
 	case "stop":
-		s.controller.Stop()
-		writeJSON(w, http.StatusOK, apiResponse{OK: true, Status: ptrSnapshot(s.controller.Snapshot())})
+		s.controller.Stop(id)
+		writeJSON(w, http.StatusOK, apiResponse{OK: true, Status: ptrSnapshot(s.controller.Snapshot(id))})
 	case "duplicate":
 		clone, err := s.store.Duplicate(id)
 		if err != nil {
@@ -302,8 +303,8 @@ func (s *WebServer) handleAPIProfileRoute(w http.ResponseWriter, r *http.Request
 		}
 		writeJSON(w, http.StatusOK, apiResponse{OK: true, Profile: &clone})
 	case "delete":
-		snapshot := s.controller.Snapshot()
-		if snapshot.ActiveProfileID == id && snapshot.State != TunnelStateDisconnected {
+		snapshot := s.controller.Snapshot(id)
+		if snapshot.State != TunnelStateDisconnected {
 			writeJSON(w, http.StatusBadRequest, apiResponse{OK: false, Message: "cannot delete a running profile"})
 			return
 		}
@@ -313,7 +314,7 @@ func (s *WebServer) handleAPIProfileRoute(w http.ResponseWriter, r *http.Request
 		}
 		writeJSON(w, http.StatusOK, apiResponse{OK: true, Profiles: s.store.List()})
 	case "diagnostics":
-		writeJSON(w, http.StatusOK, apiResponse{OK: true, Status: ptrSnapshot(s.controller.Snapshot())})
+		writeJSON(w, http.StatusOK, apiResponse{OK: true, Status: ptrSnapshot(s.controller.Snapshot(id))})
 	default:
 		http.NotFound(w, r)
 	}
@@ -321,7 +322,7 @@ func (s *WebServer) handleAPIProfileRoute(w http.ResponseWriter, r *http.Request
 
 func (s *WebServer) buildProfileViews() []profileView {
 	profiles := s.store.List()
-	snapshot := s.controller.Snapshot()
+	snapshots := s.controller.Snapshots()
 	views := make([]profileView, 0, len(profiles))
 	for _, profile := range profiles {
 		cfg := profile.TunnelConfig()
@@ -332,7 +333,7 @@ func (s *WebServer) buildProfileViews() []profileView {
 			RemotePort:    profile.RemotePort,
 			LocalPortText: strconv.Itoa(profile.LocalPort),
 		}
-		if profile.ID == snapshot.ActiveProfileID {
+		if snapshot, ok := snapshots[profile.ID]; ok {
 			view.State = snapshot.State
 			view.Health = snapshot.Health
 			view.LastError = snapshot.LastError
@@ -372,8 +373,8 @@ func (s *WebServer) buildDiagnostics(profile Profile) diagnosticsView {
 		LocalPortText: strconv.Itoa(profile.LocalPort),
 	}
 	var logs []LogEntry
-	snapshot := s.controller.Snapshot()
-	if profile.ID == snapshot.ActiveProfileID {
+	snapshot := s.controller.Snapshot(profile.ID)
+	if snapshot.State != "" {
 		view.State = snapshot.State
 		view.Health = snapshot.Health
 		view.LastError = snapshot.LastError

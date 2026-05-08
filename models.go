@@ -15,15 +15,15 @@ const (
 	keepAliveTimeout  = 15 * time.Second
 	maxBackoff        = 60 * time.Second
 	envVarName        = "TUNNEL_LOCAL_PORT"
-	defaultSSHHost    = "8.138.105.156"
-	defaultSSHPort    = 7659
-	defaultSSHUser    = "root"
+	defaultSSHHost    = "ssh.example.com"
+	defaultSSHPort    = 22
+	defaultSSHUser    = "user"
 	defaultRemoteHost = "127.0.0.1"
-	defaultRemotePort = 7897
+	defaultRemotePort = 5432
 	defaultLocalAddr  = "127.0.0.1"
-	defaultLocalPort  = 3180
+	defaultLocalPort  = 15432
 	defaultWebAddr    = "127.0.0.1:8080"
-	defaultTitle      = "默认隧道"
+	defaultTitle      = "示例隧道"
 )
 
 type TunnelConfig struct {

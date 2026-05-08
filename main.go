@@ -126,7 +126,7 @@ func runTunnelMode(opts cliOptions, logger *log.Logger) error {
 		_ = listener.Close()
 		return err
 	}
-	defer controller.Stop()
+	defer controller.Stop("cli")
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()

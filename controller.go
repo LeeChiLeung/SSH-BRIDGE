@@ -37,12 +37,12 @@ type LogEntry struct {
 }
 
 type TunnelSnapshot struct {
-	State           TunnelState  `json:"state"`
-	ActiveProfileID string       `json:"activeProfileId"`
-	Endpoint        string       `json:"endpoint"`
-	Health          TunnelHealth `json:"health"`
-	LastError       string       `json:"lastError"`
-	Logs            []LogEntry   `json:"logs"`
+	ProfileID string       `json:"profileId"`
+	State     TunnelState  `json:"state"`
+	Endpoint  string       `json:"endpoint"`
+	Health    TunnelHealth `json:"health"`
+	LastError string       `json:"lastError"`
+	Logs      []LogEntry   `json:"logs"`
 }
 
 type sessionStore struct {
@@ -129,26 +129,21 @@ type tunnelRun struct {
 }
 
 type TunnelController struct {
-	mu              sync.RWMutex
-	logger          *log.Logger
-	profileStore    *ProfileStore
-	run             *tunnelRun
-	state           TunnelState
-	activeProfileID string
-	endpoint        string
-	health          TunnelHealth
-	lastError       string
-	logs            []LogEntry
-	maxLogs         int
+	mu           sync.RWMutex
+	logger       *log.Logger
+	profileStore *ProfileStore
+	runs         map[string]*tunnelRun
+	snapshots    map[string]*TunnelSnapshot
+	maxLogs      int
 }
 
 func NewTunnelController(logger *log.Logger, store *ProfileStore) *TunnelController {
 	return &TunnelController{
 		logger:       logger,
-		state:        TunnelStateDisconnected,
-		maxLogs:      200,
-		logs:         make([]LogEntry, 0, 64),
 		profileStore: store,
+		runs:         make(map[string]*tunnelRun),
+		snapshots:    make(map[string]*TunnelSnapshot),
+		maxLogs:      200,
 	}
 }
 
@@ -164,7 +159,11 @@ func (c *TunnelController) start(profileID string, cfg TunnelConfig, listener ne
 	if err := cfg.ValidateRuntime(); err != nil {
 		return err
 	}
-	c.Stop()
+	if strings.TrimSpace(profileID) == "" {
+		return fmt.Errorf("profile ID is required")
+	}
+
+	c.Stop(profileID)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	run := &tunnelRun{
@@ -179,30 +178,28 @@ func (c *TunnelController) start(profileID string, cfg TunnelConfig, listener ne
 	}
 
 	c.mu.Lock()
-	c.run = run
-	c.activeProfileID = profileID
-	c.state = TunnelStateConnecting
-	c.endpoint = cfg.LocalEndpoint()
-	c.health = TunnelHealth{}
-	c.lastError = ""
+	c.runs[profileID] = run
+	snapshot := c.snapshotLocked(profileID)
+	snapshot.State = TunnelStateConnecting
+	snapshot.Endpoint = cfg.LocalEndpoint()
+	snapshot.Health = TunnelHealth{}
+	snapshot.LastError = ""
 	c.mu.Unlock()
 
 	go c.executeRun(run)
 	return nil
 }
 
-func (c *TunnelController) Stop() {
-	c.mu.Lock()
-	run := c.run
+func (c *TunnelController) Stop(profileID string) {
+	run := c.detachRun(profileID)
 	if run == nil {
-		c.state = TunnelStateDisconnected
-		c.health = TunnelHealth{}
-		c.endpoint = ""
-		c.lastError = ""
+		c.mu.Lock()
+		snapshot := c.snapshotLocked(profileID)
+		snapshot.State = TunnelStateDisconnected
+		snapshot.Health = TunnelHealth{}
 		c.mu.Unlock()
 		return
 	}
-	c.mu.Unlock()
 
 	run.cancel()
 	if run.listener != nil {
@@ -212,19 +209,77 @@ func (c *TunnelController) Stop() {
 	<-run.done
 }
 
-func (c *TunnelController) Snapshot() TunnelSnapshot {
+func (c *TunnelController) StopAll() {
+	c.mu.RLock()
+	ids := make([]string, 0, len(c.runs))
+	for profileID := range c.runs {
+		ids = append(ids, profileID)
+	}
+	c.mu.RUnlock()
+
+	for _, profileID := range ids {
+		c.Stop(profileID)
+	}
+}
+
+func (c *TunnelController) Snapshot(profileID string) TunnelSnapshot {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	logs := make([]LogEntry, len(c.logs))
-	copy(logs, c.logs)
-	return TunnelSnapshot{
-		State:           c.state,
-		ActiveProfileID: c.activeProfileID,
-		Endpoint:        c.endpoint,
-		Health:          c.health,
-		LastError:       c.lastError,
-		Logs:            logs,
+	snapshot, ok := c.snapshots[profileID]
+	if !ok {
+		return TunnelSnapshot{ProfileID: profileID, State: TunnelStateDisconnected}
 	}
+	return cloneSnapshot(snapshot)
+}
+
+func (c *TunnelController) Snapshots() map[string]TunnelSnapshot {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	out := make(map[string]TunnelSnapshot, len(c.snapshots))
+	for profileID, snapshot := range c.snapshots {
+		out[profileID] = cloneSnapshot(snapshot)
+	}
+	return out
+}
+
+func cloneSnapshot(snapshot *TunnelSnapshot) TunnelSnapshot {
+	if snapshot == nil {
+		return TunnelSnapshot{State: TunnelStateDisconnected}
+	}
+	logs := make([]LogEntry, len(snapshot.Logs))
+	copy(logs, snapshot.Logs)
+	return TunnelSnapshot{
+		ProfileID: snapshot.ProfileID,
+		State:     snapshot.State,
+		Endpoint:  snapshot.Endpoint,
+		Health:    snapshot.Health,
+		LastError: snapshot.LastError,
+		Logs:      logs,
+	}
+}
+
+func (c *TunnelController) snapshotLocked(profileID string) *TunnelSnapshot {
+	snapshot, ok := c.snapshots[profileID]
+	if !ok {
+		snapshot = &TunnelSnapshot{
+			ProfileID: profileID,
+			State:     TunnelStateDisconnected,
+			Logs:      make([]LogEntry, 0, 32),
+		}
+		c.snapshots[profileID] = snapshot
+	}
+	return snapshot
+}
+
+func (c *TunnelController) detachRun(profileID string) *tunnelRun {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	run := c.runs[profileID]
+	if run != nil {
+		delete(c.runs, profileID)
+	}
+	return run
 }
 
 func (c *TunnelController) executeRun(run *tunnelRun) {
@@ -234,9 +289,9 @@ func (c *TunnelController) executeRun(run *tunnelRun) {
 	if run.listener == nil {
 		listener, err := net.Listen("tcp", run.cfg.LocalEndpoint())
 		if err != nil {
-			c.setLastError(err.Error())
-			c.logf("failed to bind local listener: %v", err)
-			c.setState(TunnelStateDisconnected)
+			c.setLastError(run.profileID, err.Error())
+			c.logf(run.profileID, "failed to bind local listener: %v", err)
+			c.setState(run.profileID, TunnelStateDisconnected)
 			return
 		}
 		run.listener = listener
@@ -244,14 +299,14 @@ func (c *TunnelController) executeRun(run *tunnelRun) {
 
 	boundPort, err := listenerPort(run.listener)
 	if err == nil {
-		c.setEndpoint(net.JoinHostPort(run.cfg.LocalAddr, strconv.Itoa(boundPort)))
+		c.setEndpoint(run.profileID, net.JoinHostPort(run.cfg.LocalAddr, strconv.Itoa(boundPort)))
 	}
-	c.setListenerHealth(true)
-	c.logf("listening on %s and forwarding to %s through %s", run.listener.Addr(), run.cfg.RemoteAddr(), run.cfg.SSHAddr())
+	c.setListenerHealth(run.profileID, true)
+	c.logf(run.profileID, "listening on %s and forwarding to %s through %s", run.listener.Addr(), run.cfg.RemoteAddr(), run.cfg.SSHAddr())
 
 	acceptErr := make(chan error, 1)
 	go func() {
-		acceptErr <- acceptLoop(run.ctx, run.listener, run.sessions, run.tracker, run.cfg, c)
+		acceptErr <- acceptLoop(run.ctx, run.listener, run.sessions, run.tracker, run.cfg, c, run.profileID)
 	}()
 
 	backoff := time.Second
@@ -262,21 +317,21 @@ func (c *TunnelController) executeRun(run *tunnelRun) {
 			return
 		}
 
-		c.setState(TunnelStateConnecting)
-		c.logf("connecting to SSH jump host %s", run.cfg.SSHAddr())
+		c.setState(run.profileID, TunnelStateConnecting)
+		c.logf(run.profileID, "connecting to SSH jump host %s", run.cfg.SSHAddr())
 		client, err := dialSSH(run.ctx, run.cfg)
 		if err != nil {
 			if errors.Is(err, errAuthFailure) {
-				c.setLastError(err.Error())
-				c.logf("authentication failure: %v", err)
-				c.setSSHHealth(false)
-				c.setState(TunnelStateDisconnected)
+				c.setLastError(run.profileID, err.Error())
+				c.logf(run.profileID, "authentication failure: %v", err)
+				c.setSSHHealth(run.profileID, false)
+				c.setState(run.profileID, TunnelStateDisconnected)
 				return
 			}
-			c.setLastError(err.Error())
-			c.setSSHHealth(false)
-			c.setState(TunnelStateRetrying)
-			c.logf("retryable SSH failure: %v; retrying in %s", err, backoff)
+			c.setLastError(run.profileID, err.Error())
+			c.setSSHHealth(run.profileID, false)
+			c.setState(run.profileID, TunnelStateRetrying)
+			c.logf(run.profileID, "retryable SSH failure: %v; retrying in %s", err, backoff)
 			if err := waitForRetry(run.ctx, backoff); err != nil {
 				return
 			}
@@ -285,10 +340,10 @@ func (c *TunnelController) executeRun(run *tunnelRun) {
 		}
 
 		run.sessions.Set(client)
-		c.setSSHHealth(true)
-		c.setLastError("")
-		c.setState(TunnelStateConnected)
-		c.logf("SSH tunnel connected; forwarding local traffic to %s", run.cfg.RemoteAddr())
+		c.setSSHHealth(run.profileID, true)
+		c.setLastError(run.profileID, "")
+		c.setState(run.profileID, TunnelStateConnected)
+		c.logf(run.profileID, "SSH tunnel connected; forwarding local traffic to %s", run.cfg.RemoteAddr())
 		if !markedEnabled && c.profileStore != nil && run.profileID != "" {
 			now := time.Now()
 			_ = c.profileStore.TouchLastEnabled(run.profileID, now)
@@ -301,8 +356,8 @@ func (c *TunnelController) executeRun(run *tunnelRun) {
 			run.sessions.Clear(client)
 			_ = client.Close()
 			if err != nil {
-				c.setLastError(err.Error())
-				c.logf("accept loop stopped: %v", err)
+				c.setLastError(run.profileID, err.Error())
+				c.logf(run.profileID, "accept loop stopped: %v", err)
 			}
 			return
 		case <-run.ctx.Done():
@@ -313,10 +368,10 @@ func (c *TunnelController) executeRun(run *tunnelRun) {
 			run.sessions.Clear(client)
 			_ = client.Close()
 			run.tracker.CloseAll()
-			c.setSSHHealth(false)
-			c.setLastError(err.Error())
-			c.setState(TunnelStateRetrying)
-			c.logf("SSH session lost: %v; reconnecting in %s", err, backoff)
+			c.setSSHHealth(run.profileID, false)
+			c.setLastError(run.profileID, err.Error())
+			c.setState(run.profileID, TunnelStateRetrying)
+			c.logf(run.profileID, "SSH session lost: %v; reconnecting in %s", err, backoff)
 			if err := waitForRetry(run.ctx, backoff); err != nil {
 				return
 			}
@@ -328,54 +383,57 @@ func (c *TunnelController) executeRun(run *tunnelRun) {
 func (c *TunnelController) finalizeRun(run *tunnelRun) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.run == run {
-		c.run = nil
-		c.state = TunnelStateDisconnected
-		c.health = TunnelHealth{}
+	current := c.runs[run.profileID]
+	if current == run {
+		delete(c.runs, run.profileID)
 	}
+	snapshot := c.snapshotLocked(run.profileID)
+	snapshot.State = TunnelStateDisconnected
+	snapshot.Health = TunnelHealth{}
 }
 
-func (c *TunnelController) logf(format string, args ...any) {
+func (c *TunnelController) logf(profileID string, format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	if c.logger != nil {
-		c.logger.Print(msg)
+		c.logger.Printf("[%s] %s", profileID, msg)
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.logs = append(c.logs, LogEntry{At: time.Now(), Message: msg})
-	if len(c.logs) > c.maxLogs {
-		c.logs = c.logs[len(c.logs)-c.maxLogs:]
+	snapshot := c.snapshotLocked(profileID)
+	snapshot.Logs = append(snapshot.Logs, LogEntry{At: time.Now(), Message: msg})
+	if len(snapshot.Logs) > c.maxLogs {
+		snapshot.Logs = snapshot.Logs[len(snapshot.Logs)-c.maxLogs:]
 	}
 }
 
-func (c *TunnelController) setState(state TunnelState) {
+func (c *TunnelController) setState(profileID string, state TunnelState) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.state = state
+	c.snapshotLocked(profileID).State = state
 }
 
-func (c *TunnelController) setEndpoint(endpoint string) {
+func (c *TunnelController) setEndpoint(profileID, endpoint string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.endpoint = endpoint
+	c.snapshotLocked(profileID).Endpoint = endpoint
 }
 
-func (c *TunnelController) setListenerHealth(ready bool) {
+func (c *TunnelController) setListenerHealth(profileID string, ready bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.health.ListenerReady = ready
+	c.snapshotLocked(profileID).Health.ListenerReady = ready
 }
 
-func (c *TunnelController) setSSHHealth(ready bool) {
+func (c *TunnelController) setSSHHealth(profileID string, ready bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.health.SSHConnected = ready
+	c.snapshotLocked(profileID).Health.SSHConnected = ready
 }
 
-func (c *TunnelController) setLastError(err string) {
+func (c *TunnelController) setLastError(profileID, err string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.lastError = err
+	c.snapshotLocked(profileID).LastError = err
 }
 
 func listenerPort(listener net.Listener) (int, error) {
@@ -562,6 +620,7 @@ func acceptLoop(
 	tracker *tunnelTracker,
 	cfg TunnelConfig,
 	controller *TunnelController,
+	profileID string,
 ) error {
 	var wg sync.WaitGroup
 	defer wg.Wait()
@@ -574,7 +633,7 @@ func acceptLoop(
 			}
 			var netErr net.Error
 			if errors.As(err, &netErr) && netErr.Temporary() {
-				controller.logf("temporary accept error: %v", err)
+				controller.logf(profileID, "temporary accept error: %v", err)
 				continue
 			}
 			return fmt.Errorf("accept local connection: %w", err)
@@ -583,7 +642,7 @@ func acceptLoop(
 		wg.Add(1)
 		go func(local net.Conn) {
 			defer wg.Done()
-			handleLocalConn(local, sessions, tracker, cfg, controller)
+			handleLocalConn(local, sessions, tracker, cfg, controller, profileID)
 		}(conn)
 	}
 }
@@ -594,17 +653,18 @@ func handleLocalConn(
 	tracker *tunnelTracker,
 	cfg TunnelConfig,
 	controller *TunnelController,
+	profileID string,
 ) {
 	client := sessions.Get()
 	if client == nil {
-		controller.logf("rejecting local client %s because SSH session is unavailable", local.RemoteAddr())
+		controller.logf(profileID, "rejecting local client %s because SSH session is unavailable", local.RemoteAddr())
 		_ = local.Close()
 		return
 	}
 
 	remote, err := client.Dial("tcp", cfg.RemoteAddr())
 	if err != nil {
-		controller.logf("failed to open remote connection for local client %s: %v", local.RemoteAddr(), err)
+		controller.logf(profileID, "failed to open remote connection for local client %s: %v", local.RemoteAddr(), err)
 		_ = local.Close()
 		return
 	}
