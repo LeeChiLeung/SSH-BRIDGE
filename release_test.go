@@ -20,6 +20,23 @@ func TestReleaseBuildProducesVersionedArtifacts(t *testing.T) {
 
 	assertFileExists(t, filepath.Join(distDir, "timber-ssh-go_"+version+"_linux_amd64"))
 	assertFileExists(t, filepath.Join(distDir, "timber-ssh-go_"+version+"_windows_amd64.exe"))
+
+	output := runCommand(t, distDir, nil, filepath.Join(distDir, "timber-ssh-go_"+version+"_linux_amd64"), "--version")
+	if !strings.Contains(output, version) {
+		t.Fatalf("binary --version output missing injected version %q:\n%s", version, output)
+	}
+}
+
+func TestReleaseBuildDerivesVersionWhenUnset(t *testing.T) {
+	t.Parallel()
+
+	distDir := t.TempDir()
+	runReleaseCommand(t, distDir, map[string]string{
+		"TARGETS": "linux/amd64",
+	}, "build")
+
+	version := derivedVersionForTests(t)
+	assertFileExists(t, filepath.Join(distDir, "timber-ssh-go_"+version+"_linux_amd64"))
 }
 
 func TestReleaseDebProducesPackage(t *testing.T) {
@@ -64,8 +81,8 @@ func TestReleaseAppImageProducesArtifact(t *testing.T) {
 	assertFileExists(t, filepath.Join(distDir, "timber-ssh-go_"+version+"_linux_amd64.AppImage"))
 	assertFileExists(t, filepath.Join(distDir, ".work", "appimage-amd64", "AppDir", "usr", "bin", "timber-ssh-go"))
 	appRun := mustReadFile(t, filepath.Join(distDir, ".work", "appimage-amd64", "AppDir", "AppRun"))
-	if !strings.Contains(appRun, "--web --web-addr 127.0.0.1:8848") {
-		t.Fatalf("AppRun does not default to web mode on port 8848:\n%s", appRun)
+	if !strings.Contains(appRun, "--tray --web-addr 127.0.0.1:8848") {
+		t.Fatalf("AppRun does not default to tray mode on port 8848:\n%s", appRun)
 	}
 
 	if _, err := os.Stat(filepath.Join(distDir, ".work", "appimage-amd64", "AppDir", "profiles.json")); !os.IsNotExist(err) {
@@ -112,6 +129,18 @@ func repoRoot(t *testing.T) string {
 		t.Fatalf("getwd: %v", err)
 	}
 	return root
+}
+
+func derivedVersionForTests(t *testing.T) string {
+	t.Helper()
+
+	cmd := exec.Command("bash", "-lc", "if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then v=$(git describe --tags --dirty --always 2>/dev/null || true); if [ -n \"$v\" ]; then printf '%s' \"${v#v}\"; exit 0; fi; fi; printf '0.0.0-dev'")
+	cmd.Dir = repoRoot(t)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("derive version failed: %v\n%s", err, string(out))
+	}
+	return string(out)
 }
 
 func assertFileExists(t *testing.T, path string) {

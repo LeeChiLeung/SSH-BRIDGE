@@ -3,14 +3,14 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_NAME="${APP_NAME:-timber-ssh-go}"
-VERSION="${VERSION:-0.0.0-dev}"
 DIST_DIR="${DIST_DIR:-$ROOT_DIR/dist}"
 WORK_DIR="$DIST_DIR/.work"
-DEFAULT_TARGETS="linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64"
+DEFAULT_TARGETS="linux/amd64 linux/arm64 windows/amd64"
 TARGETS="${TARGETS:-$DEFAULT_TARGETS}"
 GOFLAGS_RELEASE="${GOFLAGS_RELEASE:--trimpath -buildvcs=false}"
 APPIMAGETOOL_BIN="${APPIMAGETOOL_BIN:-appimagetool}"
 APPIMAGE_RUNTIME_FILE="${APPIMAGE_RUNTIME_FILE:-}"
+APPIMAGE_COMP="${APPIMAGE_COMP:-xz}"
 
 usage() {
   cat <<'EOF'
@@ -21,13 +21,14 @@ Usage:
   scripts/release.sh all
 
 Environment:
-  VERSION            Artifact version string. Default: 0.0.0-dev
+  VERSION            Artifact version string. If omitted, derive from git tag/describe
   DIST_DIR           Output directory. Default: ./dist
   TARGETS            Space-separated build matrix. Default:
-                     linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64
+                     linux/amd64 linux/arm64 windows/amd64
   APPIMAGETOOL_BIN   AppImage tool path override. Default: appimagetool
   APPIMAGE_RUNTIME_FILE
                      Optional local AppImage runtime file passed to appimagetool
+  APPIMAGE_COMP      Squashfs compression for AppImage. Default: xz
   KEEP_WORK          Preserve intermediate packaging work directories when set to 1
 EOF
 }
@@ -48,6 +49,38 @@ require_cmd() {
 sanitize_version() {
   printf '%s' "$1" | tr '/ ' '--'
 }
+
+resolve_version() {
+  if [[ -n "${VERSION:-}" ]]; then
+    printf '%s' "$(printf '%s' "$VERSION" | sed 's/^v//')"
+    return
+  fi
+  if command -v git >/dev/null 2>&1 && git -C "$ROOT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    local described
+    described="$(git -C "$ROOT_DIR" describe --tags --dirty --always 2>/dev/null || true)"
+    if [[ -n "$described" ]]; then
+      printf '%s' "$(printf '%s' "$described" | sed 's/^v//')"
+      return
+    fi
+  fi
+  printf '0.0.0-dev'
+}
+
+resolve_commit() {
+  if command -v git >/dev/null 2>&1 && git -C "$ROOT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    git -C "$ROOT_DIR" rev-parse --short=12 HEAD 2>/dev/null || printf 'unknown'
+    return
+  fi
+  printf 'unknown'
+}
+
+resolve_build_date() {
+  date -u +"%Y-%m-%dT%H:%M:%SZ"
+}
+
+VERSION="$(resolve_version)"
+BUILD_COMMIT="${BUILD_COMMIT:-$(resolve_commit)}"
+BUILD_DATE="${BUILD_DATE:-$(resolve_build_date)}"
 
 versioned_name() {
   local os="$1"
@@ -98,10 +131,12 @@ build_target() {
   local os="$1"
   local arch="$2"
   local out
+  local ldflags
   out="$(binary_path "$os" "$arch")"
+  ldflags="-X main.buildVersion=$VERSION -X main.buildCommit=$BUILD_COMMIT -X main.buildDate=$BUILD_DATE"
   ensure_dir "$DIST_DIR"
   log "building $os/$arch -> $out"
-  GOOS="$os" GOARCH="$arch" CGO_ENABLED=0 go build $GOFLAGS_RELEASE -o "$out" .
+  GOOS="$os" GOARCH="$arch" CGO_ENABLED=0 go build $GOFLAGS_RELEASE -ldflags "$ldflags" -o "$out" .
 }
 
 build_all() {
@@ -132,8 +167,8 @@ package_deb() {
   local deb_arch
   deb_arch="$(map_deb_arch "$arch")"
   local binary
+  build_target linux "$arch"
   binary="$(binary_path linux "$arch")"
-  [[ -f "$binary" ]] || build_target linux "$arch"
 
   local pkg_name
   pkg_name="$(versioned_name linux "$arch" ".deb")"
@@ -176,8 +211,8 @@ package_appimage() {
   local appimage_arch
   appimage_arch="$(map_appimage_arch "$arch")"
   local binary
+  build_target linux "$arch"
   binary="$(binary_path linux "$arch")"
-  [[ -f "$binary" ]] || build_target linux "$arch"
 
   local work="$WORK_DIR/appimage-${arch}"
   local appdir="$work/AppDir"
@@ -186,6 +221,7 @@ package_appimage() {
   rm -rf "$work"
   ensure_dir "$appdir/usr/bin"
   ensure_dir "$appdir/usr/share/applications"
+  ensure_dir "$appdir/usr/share/icons/hicolor/32x32/apps"
   ensure_dir "$appdir/usr/share/icons/hicolor/scalable/apps"
   ensure_dir "$DIST_DIR"
 
@@ -193,6 +229,9 @@ package_appimage() {
   chmod 0755 "$appdir/usr/bin/$APP_NAME"
   cp "$ROOT_DIR/packaging/appimage/$APP_NAME.desktop" "$appdir/usr/share/applications/$APP_NAME.desktop"
   cp "$ROOT_DIR/packaging/appimage/$APP_NAME.desktop" "$appdir/$APP_NAME.desktop"
+  if [[ -f "$ROOT_DIR/icon/32x32.png" ]]; then
+    cp "$ROOT_DIR/icon/32x32.png" "$appdir/usr/share/icons/hicolor/32x32/apps/$APP_NAME.png"
+  fi
   cp "$ROOT_DIR/packaging/appimage/$APP_NAME.svg" "$appdir/usr/share/icons/hicolor/scalable/apps/$APP_NAME.svg"
   cp "$ROOT_DIR/packaging/appimage/$APP_NAME.svg" "$appdir/$APP_NAME.svg"
   ln -sf "$APP_NAME.svg" "$appdir/.DirIcon"
@@ -201,20 +240,24 @@ cat >"$appdir/AppRun" <<EOF
 set -euo pipefail
 HERE="\$(cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
 if [[ "\$#" -eq 0 ]]; then
-  exec "\$HERE/usr/bin/$APP_NAME" --web --web-addr 127.0.0.1:8848
+  exec "\$HERE/usr/bin/$APP_NAME" --tray --web-addr 127.0.0.1:8848
 fi
 exec "\$HERE/usr/bin/$APP_NAME" "\$@"
 EOF
   chmod 0755 "$appdir/AppRun"
 
+  local tmp_out="$out.tmp"
+  rm -f "$tmp_out"
+
   local -a appimagetool_args
-  appimagetool_args=("$appdir" "$out")
+  appimagetool_args=(--comp "$APPIMAGE_COMP" "$appdir" "$tmp_out")
   if [[ -n "$APPIMAGE_RUNTIME_FILE" ]]; then
     [[ -f "$APPIMAGE_RUNTIME_FILE" ]] || fail "missing AppImage runtime file: $APPIMAGE_RUNTIME_FILE"
     appimagetool_args=(--runtime-file "$APPIMAGE_RUNTIME_FILE" "${appimagetool_args[@]}")
   fi
 
   ARCH="$appimage_arch" "$APPIMAGETOOL_BIN" "${appimagetool_args[@]}"
+  mv -f "$tmp_out" "$out"
   cleanup_workdir "$work"
   log "created $out"
 }

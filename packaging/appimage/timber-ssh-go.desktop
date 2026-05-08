@@ -2,7 +2,7 @@
 Type=Application
 Name=Timber SSH Go
 Comment=Local SSH tunnel manager with Web console
-Exec=timber-ssh-go --web --web-addr 127.0.0.1:8848
+Exec=timber-ssh-go --tray --web-addr 127.0.0.1:8848
 Icon=timber-ssh-go
-Terminal=true
+Terminal=false
 Categories=Network;Development;

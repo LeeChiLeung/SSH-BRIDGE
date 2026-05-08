@@ -39,6 +39,7 @@ type detailPanelData struct {
 
 type indexPageData struct {
 	PageTitle string
+	Version   string
 	Cards     []profileView
 	Detail    detailPanelData
 }
@@ -125,6 +126,7 @@ func (s *WebServer) handleIndex(w http.ResponseWriter, r *http.Request) {
 	detail := s.defaultDetail(cards)
 	s.render(w, "page", indexPageData{
 		PageTitle: "SSH Tunnel Console",
+		Version:   currentBuildInfo().Version,
 		Cards:     cards,
 		Detail:    detail,
 	})
@@ -498,6 +500,7 @@ const webTemplates = `
     .toggle-refresh { display:inline-flex; align-items:center; gap:10px; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:10px 14px; color:var(--muted); font-size:14px; box-shadow:0 8px 20px rgba(15,23,42,.04); }
     .toggle-refresh input { width:18px; height:18px; }
     .layout { display:grid; gap:22px; }
+    .footer { margin-top:18px; padding:0 4px; color:var(--muted); font-size:13px; text-align:right; }
     .cards-panel, .detail-panel { background:rgba(255,255,255,.64); border:1px solid rgba(217,224,234,.8); border-radius:24px; padding:18px; backdrop-filter:blur(8px); }
     .cards-wrap { display:grid; gap:18px; }
     .card { display:grid; grid-template-columns: minmax(280px,1.2fr) minmax(240px,1fr) 280px; gap:18px; background:var(--card); border:1px solid var(--line); border-radius:22px; padding:16px; box-shadow:0 10px 30px rgba(15,23,42,.05); }
@@ -563,6 +566,7 @@ const webTemplates = `
       {{template "cardsPanel" .Cards}}
       <section id="detail-panel" class="detail-panel">{{template "detailPanel" .Detail}}</section>
     </section>
+    <footer class="footer">Version {{.Version}}</footer>
   </main>
   <script>
     (() => {

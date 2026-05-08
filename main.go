@@ -16,11 +16,13 @@ import (
 
 type cliOptions struct {
 	TunnelConfig
-	EnvMode    bool
-	ChildMode  bool
-	ListenerFD int
-	WebMode    bool
-	WebAddr    string
+	EnvMode     bool
+	ChildMode   bool
+	ListenerFD  int
+	WebMode     bool
+	TrayMode    bool
+	WebAddr     string
+	VersionMode bool
 }
 
 func main() {
@@ -32,9 +34,21 @@ func main() {
 
 	logger := log.New(os.Stderr, "", log.LstdFlags)
 
+	if opts.VersionMode {
+		fmt.Println(versionString())
+		return
+	}
+
 	if opts.WebMode {
 		if err := runWebMode(opts, logger); err != nil {
 			logger.Printf("web console exited with error: %v", err)
+			os.Exit(1)
+		}
+		return
+	}
+	if opts.TrayMode {
+		if err := runTrayMode(opts, logger); err != nil {
+			logger.Printf("tray mode exited with error: %v", err)
 			os.Exit(1)
 		}
 		return
@@ -72,7 +86,9 @@ func parseCLI() (cliOptions, error) {
 	flag.BoolVar(&opts.ChildMode, "child", false, "Internal flag used by --env mode")
 	flag.IntVar(&opts.ListenerFD, "listener-fd", 0, "Internal file descriptor used by --env mode")
 	flag.BoolVar(&opts.WebMode, "web", false, "Run the local Web control console instead of starting the tunnel directly")
+	flag.BoolVar(&opts.TrayMode, "tray", false, "Run the local Web control console with a system tray entry")
 	flag.StringVar(&opts.WebAddr, "web-addr", defaultWebAddr, "Local Web console listen address")
+	flag.BoolVar(&opts.VersionMode, "version", false, "Print version information and exit")
 	flag.Parse()
 
 	if sshAddrOverride != "" {
@@ -92,7 +108,10 @@ func parseCLI() (cliOptions, error) {
 		opts.RemotePort = port
 	}
 
-	if opts.WebMode {
+	if opts.VersionMode {
+		return opts, nil
+	}
+	if opts.WebMode || opts.TrayMode {
 		if opts.WebAddr == "" {
 			return opts, fmt.Errorf("web listen address is required")
 		}
@@ -135,23 +154,104 @@ func runTunnelMode(opts cliOptions, logger *log.Logger) error {
 }
 
 func runWebMode(opts cliOptions, logger *log.Logger) error {
-	store, err := NewProfileStore(defaultProfileStorePath())
+	return runManagedWebMode(opts, logger, nil)
+}
+
+func runTrayMode(opts cliOptions, logger *log.Logger) error {
+	managed, err := newManagedWebMode(opts, logger)
 	if err != nil {
 		return err
 	}
-	if _, err := store.EnsureDefault(opts.TunnelConfig); err != nil {
+
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
+
+	serverErrCh := make(chan error, 1)
+	go func() {
+		serverErrCh <- managed.server.Run(ctx)
+	}()
+
+	tray, err := newDefaultTrayApp(logger, managed.webURL(), cancel)
+	if err != nil {
+		cancel()
 		return err
+	}
+
+	trayErrCh := make(chan error, 1)
+	go func() {
+		trayErrCh <- tray.Run(ctx)
+	}()
+
+	var firstErr error
+	var serverErr error
+	var trayErr error
+	serverDone := false
+	trayDone := false
+	select {
+	case err := <-serverErrCh:
+		firstErr = err
+		serverErr = err
+		serverDone = true
+		cancel()
+	case err := <-trayErrCh:
+		firstErr = err
+		trayErr = err
+		trayDone = true
+		cancel()
+	}
+
+	if !serverDone {
+		serverErr = <-serverErrCh
+	}
+	if !trayDone {
+		trayErr = <-trayErrCh
+	}
+	if firstErr != nil {
+		return firstErr
+	}
+	if serverErr != nil {
+		return serverErr
+	}
+	return trayErr
+}
+
+type managedWebMode struct {
+	server  *WebServer
+	webAddr string
+}
+
+func (m *managedWebMode) webURL() string {
+	return "http://" + m.webAddr
+}
+
+func newManagedWebMode(opts cliOptions, logger *log.Logger) (*managedWebMode, error) {
+	store, err := NewProfileStore(defaultProfileStorePath())
+	if err != nil {
+		return nil, err
+	}
+	if _, err := store.EnsureDefault(opts.TunnelConfig); err != nil {
+		return nil, err
 	}
 
 	controller := NewTunnelController(logger, store)
 	server, err := NewWebServer(opts.WebAddr, controller, store, logger)
 	if err != nil {
+		return nil, err
+	}
+	return &managedWebMode{server: server, webAddr: opts.WebAddr}, nil
+}
+
+func runManagedWebMode(opts cliOptions, logger *log.Logger, ctx context.Context) error {
+	managed, err := newManagedWebMode(opts, logger)
+	if err != nil {
 		return err
 	}
-
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
-	return server.Run(ctx)
+	if ctx == nil {
+		var stop context.CancelFunc
+		ctx, stop = signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+		defer stop()
+	}
+	return managed.server.Run(ctx)
 }
 
 func prepareListener(opts cliOptions) (net.Listener, error) {
