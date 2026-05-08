@@ -402,8 +402,15 @@ func (s *WebServer) render(w http.ResponseWriter, name string, data any) {
 }
 
 func profileFromRequest(r *http.Request) (Profile, error) {
-	if err := r.ParseMultipartForm(8 << 20); err != nil && !strings.Contains(err.Error(), "not multipart") {
-		return Profile{}, err
+	contentType := r.Header.Get("Content-Type")
+	if strings.Contains(contentType, "multipart/form-data") {
+		if err := r.ParseMultipartForm(8 << 20); err != nil {
+			return Profile{}, err
+		}
+	} else {
+		if err := r.ParseForm(); err != nil {
+			return Profile{}, err
+		}
 	}
 
 	profile := Profile{
@@ -411,6 +418,7 @@ func profileFromRequest(r *http.Request) (Profile, error) {
 		Title:              strings.TrimSpace(r.FormValue("title")),
 		SSHHost:            strings.TrimSpace(r.FormValue("ssh_host")),
 		SSHUser:            strings.TrimSpace(r.FormValue("ssh_user")),
+		SSHPassword:        r.FormValue("ssh_password"),
 		SSHKeyPath:         strings.TrimSpace(r.FormValue("ssh_key_path")),
 		RemoteHost:         strings.TrimSpace(r.FormValue("remote_host")),
 		LocalAddr:          strings.TrimSpace(r.FormValue("local_addr")),
@@ -768,7 +776,7 @@ const webTemplates = `
     <div class="detail-head">
       <div>
         <div class="detail-title">{{if .Profile.ID}}编辑配置{{else}}新增配置{{end}}</div>
-        <div class="detail-sub">保存的是 profile 配置，不会持久化密码或私钥内容。</div>
+        <div class="detail-sub">密码优先于私钥认证。当前 profile 会把密码和私钥路径一起保存到本地配置文件。</div>
       </div>
     </div>
     <form action="{{.FormAction}}" method="post" data-async-form="true" data-target="#detail-panel">
@@ -778,11 +786,12 @@ const webTemplates = `
         <div class="form-field"><label>SSH 用户</label><input name="ssh_user" value="{{.Profile.SSHUser}}"></div>
         <div class="form-field"><label>SSH 地址</label><input name="ssh_host" value="{{.Profile.SSHHost}}"></div>
         <div class="form-field"><label>SSH 端口</label><input name="ssh_port" value="{{.Profile.SSHPort}}"></div>
+        <div class="form-field"><label>SSH 密码</label><input type="password" name="ssh_password" value="{{.Profile.SSHPassword}}"></div>
+        <div class="form-field"><label>私钥路径</label><input name="ssh_key_path" value="{{.Profile.SSHKeyPath}}" placeholder="密码为空时才会使用私钥"></div>
         <div class="form-field"><label>本地地址</label><input name="local_addr" value="{{.Profile.LocalAddr}}"></div>
         <div class="form-field"><label>本地端口</label><input name="local_port" value="{{.Profile.LocalPort}}"></div>
         <div class="form-field"><label>远程地址</label><input name="remote_host" value="{{.Profile.RemoteHost}}"></div>
         <div class="form-field"><label>远程端口</label><input name="remote_port" value="{{.Profile.RemotePort}}"></div>
-        <div class="form-field full"><label>私钥路径</label><input name="ssh_key_path" value="{{.Profile.SSHKeyPath}}"></div>
         <div class="form-field"><label>超时秒数</label><input name="connect_timeout_sec" value="{{if .Profile.ConnectTimeoutSec}}{{.Profile.ConnectTimeoutSec}}{{else}}10{{end}}"></div>
         <div class="form-field"><label>Known Hosts 路径</label><input name="known_hosts_path" value="{{.Profile.KnownHostsPath}}"></div>
         <div class="form-field full"><label><input type="checkbox" name="insecure_ignore_host" {{if .Profile.InsecureIgnoreHost}}checked{{end}}> 忽略 Host Key 校验</label></div>

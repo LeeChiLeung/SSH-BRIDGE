@@ -16,6 +16,7 @@ type Profile struct {
 	SSHHost            string     `json:"sshHost"`
 	SSHPort            int        `json:"sshPort"`
 	SSHUser            string     `json:"sshUser"`
+	SSHPassword        string     `json:"sshPassword"`
 	SSHKeyPath         string     `json:"sshKeyPath"`
 	RemoteHost         string     `json:"remoteHost"`
 	RemotePort         int        `json:"remotePort"`
@@ -37,6 +38,7 @@ func (p Profile) TunnelConfig() TunnelConfig {
 		SSHHost:            p.SSHHost,
 		SSHPort:            p.SSHPort,
 		SSHUser:            p.SSHUser,
+		SSHPassword:        p.SSHPassword,
 		SSHKeyPath:         p.SSHKeyPath,
 		RemoteHost:         p.RemoteHost,
 		RemotePort:         p.RemotePort,
@@ -55,6 +57,7 @@ func profileFromConfig(id string, cfg TunnelConfig) Profile {
 		SSHHost:            cfg.SSHHost,
 		SSHPort:            cfg.SSHPort,
 		SSHUser:            cfg.SSHUser,
+		SSHPassword:        cfg.SSHPassword,
 		SSHKeyPath:         cfg.SSHKeyPath,
 		RemoteHost:         cfg.RemoteHost,
 		RemotePort:         cfg.RemotePort,

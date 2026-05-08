@@ -592,7 +592,7 @@ func dialSSH(ctx context.Context, cfg TunnelConfig) (*ssh.Client, error) {
 func sshAuthMethods(cfg TunnelConfig) ([]ssh.AuthMethod, error) {
 	methods := make([]ssh.AuthMethod, 0, 2)
 	if cfg.SSHPassword != "" {
-		methods = append(methods, ssh.Password(cfg.SSHPassword))
+		return append(methods, ssh.Password(cfg.SSHPassword)), nil
 	}
 	if cfg.SSHKeyPath != "" {
 		keyPath, err := expandPath(cfg.SSHKeyPath)

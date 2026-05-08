@@ -3,6 +3,8 @@ package main
 import (
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"log"
@@ -232,6 +234,51 @@ func TestTunnelControllerTracksTrafficMetrics(t *testing.T) {
 	if snapshot.Traffic.UploadBytesTotal == 0 || snapshot.Traffic.DownloadBytesTotal == 0 {
 		t.Fatalf("traffic totals not recorded: %+v", snapshot.Traffic)
 	}
+}
+
+func TestSSHDialPrefersPasswordOverPrivateKey(t *testing.T) {
+	t.Parallel()
+
+	sshAddr, closeSSH := startTestSSHServer(t, "secret")
+	defer closeSSH()
+
+	echoAddr, closeEcho := startEchoServer(t, "pong")
+	defer closeEcho()
+
+	controller := NewTunnelController(log.New(io.Discard, "", 0), newTestProfileStore(t))
+	defer controller.StopAll()
+
+	cfg := testTunnelConfig(sshAddr, echoAddr, "secret")
+	cfg.SSHKeyPath = filepath.Join(t.TempDir(), "missing_id_rsa")
+	if err := controller.Start("password-priority", cfg); err != nil {
+		t.Fatalf("start password-priority: %v", err)
+	}
+
+	waitForState(t, controller, "password-priority", TunnelStateConnected)
+	assertForwarding(t, controller.Snapshot("password-priority").Endpoint, "pong")
+}
+
+func TestSSHDialUsesPrivateKeyWhenPasswordAbsent(t *testing.T) {
+	t.Parallel()
+
+	keyPath, publicKey := generateClientKeyPair(t)
+	sshAddr, closeSSH := startPublicKeyTestSSHServer(t, publicKey)
+	defer closeSSH()
+
+	echoAddr, closeEcho := startEchoServer(t, "keyy")
+	defer closeEcho()
+
+	controller := NewTunnelController(log.New(io.Discard, "", 0), newTestProfileStore(t))
+	defer controller.StopAll()
+
+	cfg := testTunnelConfig(sshAddr, echoAddr, "")
+	cfg.SSHKeyPath = keyPath
+	if err := controller.Start("key-only", cfg); err != nil {
+		t.Fatalf("start key-only: %v", err)
+	}
+
+	waitForState(t, controller, "key-only", TunnelStateConnected)
+	assertForwarding(t, controller.Snapshot("key-only").Endpoint, "keyy")
 }
 
 func newTestProfileStore(t *testing.T) *ProfileStore {
@@ -472,6 +519,78 @@ func startTestSSHServer(t *testing.T, password string) (string, func()) {
 		<-done
 		wg.Wait()
 	}
+}
+
+func startPublicKeyTestSSHServer(t *testing.T, allowed ssh.PublicKey) (string, func()) {
+	t.Helper()
+
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("generate ssh host key: %v", err)
+	}
+	signer, err := ssh.NewSignerFromKey(privateKey)
+	if err != nil {
+		t.Fatalf("new signer: %v", err)
+	}
+
+	config := &ssh.ServerConfig{
+		PublicKeyCallback: func(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
+			if conn.User() == "tester" && string(key.Marshal()) == string(allowed.Marshal()) {
+				return nil, nil
+			}
+			return nil, fmt.Errorf("public key rejected")
+		},
+	}
+	config.AddHostKey(signer)
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen ssh: %v", err)
+	}
+
+	var wg sync.WaitGroup
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for {
+			rawConn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			wg.Add(1)
+			go func(conn net.Conn) {
+				defer wg.Done()
+				handleSSHConn(conn, config)
+			}(rawConn)
+		}
+	}()
+
+	return listener.Addr().String(), func() {
+		_ = listener.Close()
+		<-done
+		wg.Wait()
+	}
+}
+
+func generateClientKeyPair(t *testing.T) (string, ssh.PublicKey) {
+	t.Helper()
+
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("generate client key: %v", err)
+	}
+	signer, err := ssh.NewSignerFromKey(privateKey)
+	if err != nil {
+		t.Fatalf("new client signer: %v", err)
+	}
+
+	block := &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(privateKey)}
+	path := filepath.Join(t.TempDir(), "id_rsa")
+	if err := os.WriteFile(path, pem.EncodeToMemory(block), 0o600); err != nil {
+		t.Fatalf("write private key: %v", err)
+	}
+
+	return path, signer.PublicKey()
 }
 
 func handleSSHConn(rawConn net.Conn, config *ssh.ServerConfig) {
