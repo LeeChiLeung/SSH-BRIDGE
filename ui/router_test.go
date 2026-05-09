@@ -94,7 +94,7 @@ func TestRouterRendersHomePage(t *testing.T) {
 		t.Fatalf("status = %d, want 200", rec.Code)
 	}
 	body := rec.Body.String()
-	for _, want := range []string{"Timber SSH Go", "数据库隧道", "ssh.example.com:22", "新增配置", "刷新", "导出配置", "导入配置"} {
+	for _, want := range []string{"SSH BRIDGE", "brand-logo.png", "数据库隧道", "ssh.example.com:22", "新增配置", "刷新", "导出配置", "导入配置"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("response missing %q:\n%s", want, body)
 		}
@@ -125,7 +125,7 @@ func TestRouterSwitchesLanguage(t *testing.T) {
 	rec := httptest.NewRecorder()
 	app.Router().ServeHTTP(rec, req)
 	body := rec.Body.String()
-	if !strings.Contains(body, "New Profile") || !strings.Contains(body, "Refresh") {
+	if !strings.Contains(body, "New Profile") || !strings.Contains(body, "Refresh") || !strings.Contains(body, "SSH BRIDGE") {
 		t.Fatalf("english response missing translated text:\n%s", body)
 	}
 	if cookie := rec.Header().Get("Set-Cookie"); !strings.Contains(cookie, "timber_lang=en") {
@@ -155,7 +155,7 @@ func TestRouterSwitchesLanguageToJapanese(t *testing.T) {
 	rec := httptest.NewRecorder()
 	app.Router().ServeHTTP(rec, req)
 	body := rec.Body.String()
-	for _, want := range []string{"新規プロファイル", "更新", "日本語"} {
+	for _, want := range []string{"新規プロファイル", "更新", "JP", "SSH BRIDGE"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("japanese response missing %q:\n%s", want, body)
 		}
@@ -233,7 +233,7 @@ func TestRouterRendersNewProfileAsModal(t *testing.T) {
 		t.Fatalf("status = %d, want 200", rec.Code)
 	}
 	body := rec.Body.String()
-	for _, want := range []string{"modal-backdrop", "新增配置", "关闭", "Timber SSH Go"} {
+	for _, want := range []string{"modal-backdrop", "新增配置", "aria-label=\"关闭\"", "SSH BRIDGE"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("response missing %q:\n%s", want, body)
 		}

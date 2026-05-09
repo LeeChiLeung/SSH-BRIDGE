@@ -18,6 +18,9 @@ func baseStyles() string {
     .hero { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; background:var(--card); border:1px solid var(--line); border-radius:24px; padding:24px 28px; box-shadow:0 12px 30px rgba(15,23,42,.06); }
     .hero h1 { margin:0 0 8px; font-size:32px; }
     .hero p { margin:0; color:var(--muted); line-height:1.6; }
+    .brand { display:flex; align-items:center; gap:16px; min-width:0; }
+    .brand img { width:32px; height:32px; object-fit:contain; border-radius:8px; flex:0 0 auto; }
+    .brand h1 { margin:0; }
     .actions { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
     .link { display:inline-flex; align-items:center; justify-content:center; min-height:44px; padding:0 16px; border-radius:14px; text-decoration:none; border:1px solid var(--line); color:var(--text); background:#fff; cursor:pointer; font:inherit; }
     button.link { appearance:none; }
@@ -80,6 +83,9 @@ func baseStyles() string {
     .full { grid-column:1/-1; }
     .field label { display:block; margin-bottom:6px; color:var(--muted); font-size:13px; }
     .field input { width:100%; border:1px solid var(--line); border-radius:12px; padding:11px 12px; font-size:14px; }
+    .check-field { display:flex; align-items:center; gap:10px; padding-top:8px; }
+    .check-field label { display:inline-flex; align-items:center; gap:10px; margin:0; color:var(--muted); font-size:13px; }
+    .check-field input[type="checkbox"] { width:18px; height:18px; margin:0; }
     .notice { margin:0; color:var(--muted); line-height:1.6; }
     .notice.warn { color:#9a3412; }
     .actions-row { display:flex; justify-content:flex-end; gap:12px; margin-top:18px; }
@@ -145,4 +151,8 @@ func withLangPage(path, lang string) string {
 		return parsed.Path
 	}
 	return parsed.Path + "?" + parsed.RawQuery
+}
+
+func faviconLinks() string {
+	return `<link rel="icon" type="image/x-icon" href="/favicon.ico"><link rel="shortcut icon" href="/favicon.ico">`
 }

@@ -22,7 +22,7 @@ func Detail(data viewmodel.DetailPageData) templ.Component {
 		}
 		_, err := fmt.Fprintf(w, `<!doctype html>
 <html lang="%s"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>%s</title><style>%s</style></head><body><main class="page">
+<title>%s</title>%s<style>%s</style></head><body><main class="page">
 <section class="hero"><div><h1>%s</h1><p>%s</p></div>
 <div class="actions">%s %s <a class="link primary" href="%s">%s</a></div></section>
 %s
@@ -37,7 +37,8 @@ func Detail(data viewmodel.DetailPageData) templ.Component {
 <script>%s</script>
 <footer class="footer">Version %s</footer></main></body></html>`,
 			template.HTMLEscapeString(data.Lang),
-			template.HTMLEscapeString(data.Title),
+			template.HTMLEscapeString(t.T("app.brand")),
+			faviconLinks(),
 			baseStyles(),
 			template.HTMLEscapeString(data.Card.Title),
 			template.HTMLEscapeString(t.T("detail.title")),

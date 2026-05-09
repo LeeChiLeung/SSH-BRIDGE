@@ -22,12 +22,13 @@ func Home(data viewmodel.HomePageData) templ.Component {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>%s</title>
+  %s
   <style>%s</style>
 </head>
 	<body>
   <main class="page">
     <section class="hero">
-      <div><h1>%s</h1></div>
+      <div class="brand"><img src="/brand-logo.png" alt="%s"><h1>%s</h1></div>
       <div class="actions">
         %s
         <a class="link" href="%s">%s</a>
@@ -37,8 +38,10 @@ func Home(data viewmodel.HomePageData) templ.Component {
       </div>
     </section>`,
 			template.HTMLEscapeString(data.Lang),
-			template.HTMLEscapeString(data.Title),
+			template.HTMLEscapeString(t.T("app.brand")),
+			faviconLinks(),
 			baseStyles(),
+			template.HTMLEscapeString(t.T("app.brand")),
 			template.HTMLEscapeString(t.T("app.brand")),
 			languageSwitcher(orFallback(data.CurrentURL, data.HomeURL), data.Lang, t),
 			template.HTMLEscapeString(data.ExportURL),
@@ -134,7 +137,7 @@ func renderListRow(row viewmodel.ProfileCard, t i18n.Translator) string {
 	if row.Selected {
 		rowClass += " selected"
 	}
-return fmt.Sprintf(`<article class="%s">
+	return fmt.Sprintf(`<article class="%s">
 <a class="row-main" href="%s">
   <span><span class="state state-%s">%s</span></span>
   <span class="row-title">%s</span>

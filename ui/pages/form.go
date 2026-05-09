@@ -21,12 +21,12 @@ func Form(data viewmodel.FormPageData) templ.Component {
 
 func standaloneFormPage(data viewmodel.FormPageData) string {
 	t := i18n.New(data.Lang)
-	title := formTitle(data, t)
 	return fmt.Sprintf(`<!doctype html>
 <html lang="%s"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>%s</title><style>%s</style></head><body><main class="page">%s<footer class="footer">Version %s</footer></main></body></html>`,
+<title>%s</title>%s<style>%s</style></head><body><main class="page">%s<footer class="footer">Version %s</footer></main></body></html>`,
 		template.HTMLEscapeString(data.Lang),
-		template.HTMLEscapeString(title),
+		template.HTMLEscapeString(t.T("app.brand")),
+		faviconLinks(),
 		baseStyles(),
 		renderFormModal(data),
 		template.HTMLEscapeString(data.Version),
@@ -55,7 +55,7 @@ func renderFormModal(data viewmodel.FormPageData) string {
     <input type="hidden" name="redirect_to" value="%s">
     <div class="grid">
       %s
-      <div class="field full"><label><input type="checkbox" name="insecure_ignore_host" %s> %s</label></div>
+      <div class="field full check-field"><label><input type="checkbox" name="insecure_ignore_host" %s><span>%s</span></label></div>
     </div>
     <div class="actions-row">
       <a class="link" href="%s">%s</a>
