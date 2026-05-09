@@ -73,9 +73,9 @@ func DiagnosticsPanel(data viewmodel.DetailPageData) templ.Component {
 func detailActions(data viewmodel.DetailPageData, t i18n.Translator) string {
 	actions := []string{
 		fmt.Sprintf(`<a class="link" href="%s">%s</a>`, template.HTMLEscapeString(data.EditURL), template.HTMLEscapeString(t.T("detail.edit"))),
-		actionForm(data.StartURL, data.Lang, t.T("detail.start"), "link primary", data.CanStart),
-		actionForm(data.StopURL, data.Lang, t.T("detail.stop"), "link", data.CanStop),
-		actionForm(data.DeleteURL, data.Lang, t.T("detail.delete"), "link danger", data.CanStart),
+		actionForm(data.StartURL, data.HomeURL, data.Lang, t.T("detail.start"), "link primary", data.CanStart),
+		actionForm(data.StopURL, data.HomeURL, data.Lang, t.T("detail.stop"), "link", data.CanStop),
+		actionForm(data.DeleteURL, data.HomeURL, data.Lang, t.T("detail.delete"), "link danger", data.CanStart),
 	}
 	if data.LegacyURL != "" {
 		actions = append(actions, fmt.Sprintf(`<a class="link" href="%s">%s</a>`, template.HTMLEscapeString(data.LegacyURL), template.HTMLEscapeString(t.T("home.open_legacy"))))
@@ -83,15 +83,16 @@ func detailActions(data viewmodel.DetailPageData, t i18n.Translator) string {
 	return strings.Join(actions, " ")
 }
 
-func actionForm(actionURL, lang, label, className string, enabled bool) string {
+func actionForm(actionURL, redirectURL, lang, label, className string, enabled bool) string {
 	disabled := ""
 	if !enabled {
 		disabled = ` disabled style="opacity:.45;cursor:not-allowed;"`
 	}
 	return fmt.Sprintf(
-		`<form class="inline-form" action="%s" method="post"><input type="hidden" name="lang" value="%s"><button class="%s" type="submit"%s>%s</button></form>`,
+		`<form class="inline-form" action="%s" method="post"><input type="hidden" name="lang" value="%s"><input type="hidden" name="redirect_to" value="%s"><button class="%s" type="submit"%s>%s</button></form>`,
 		template.HTMLEscapeString(actionURL),
 		template.HTMLEscapeString(lang),
+		template.HTMLEscapeString(redirectURL),
 		template.HTMLEscapeString(className),
 		disabled,
 		template.HTMLEscapeString(label),

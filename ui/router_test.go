@@ -480,6 +480,57 @@ func TestRouterRendersDiagnosticsFragment(t *testing.T) {
 	}
 }
 
+func TestRouterDetailActionsRedirectBackToSelectedHome(t *testing.T) {
+	app := NewApp(RouterDeps{
+		HomeData:      func(lang string) viewmodel.HomePageData { return viewmodel.HomePageData{} },
+		NewFormData:   func(lang string) viewmodel.FormPageData { return viewmodel.FormPageData{} },
+		NewImportData: func(lang string) viewmodel.ImportModalData { return viewmodel.ImportModalData{} },
+		EditFormData:  func(id string, lang string) (viewmodel.FormPageData, bool) { return viewmodel.FormPageData{}, false },
+		SaveProfile:   func(r *http.Request) (string, error) { return "", nil },
+		StartProfile:  func(id string) error { return nil },
+		StopProfile:   func(id string) error { return nil },
+		DeleteProfile: func(id string) error { return nil },
+		ExportProfiles: func() (string, []byte, error) { return "profiles.json", []byte("{}"), nil },
+		PreviewImport:  func(data []byte) (viewmodel.ImportModalData, error) { return viewmodel.ImportModalData{}, nil },
+		ApplyImport:    func(data []byte, policy string) (viewmodel.ImportResultData, error) { return viewmodel.ImportResultData{}, nil },
+		DetailData: func(id string, lang string) (viewmodel.DetailPageData, bool) {
+			return viewmodel.DetailPageData{
+				Lang:      lang,
+				Title:     "Timber SSH Go",
+				Version:   "0.0.2",
+				HomeURL:   "/?selected=" + id,
+				EditURL:   "/profiles/" + id + "/edit",
+				ProfileID: id,
+				StartURL:  "/profiles/" + id + "/start",
+				StopURL:   "/profiles/" + id + "/stop",
+				DeleteURL: "/profiles/" + id + "/delete",
+				CanStart:  true,
+				CanStop:   true,
+				Card: viewmodel.ProfileCard{
+					Lang:          lang,
+					Title:         "数据库隧道",
+					SSHAddress:    "ssh.example.com:22",
+					LocalEndpoint: "127.0.0.1:15432",
+					RemoteTarget:  "127.0.0.1:5432",
+					StateLabel:    "未连接",
+				},
+				Diagnostics: viewmodel.DiagnosticsPanel{
+					ActiveConnections: "0",
+				},
+			}, true
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/profiles/profile-1", nil)
+	rec := httptest.NewRecorder()
+	app.Router().ServeHTTP(rec, req)
+
+	body := rec.Body.String()
+	if !strings.Contains(body, `name="redirect_to" value="/?selected=profile-1"`) {
+		t.Fatalf("detail actions missing selected-home redirect:\n%s", body)
+	}
+}
+
 func TestRouterRendersImportModal(t *testing.T) {
 	app := NewApp(RouterDeps{
 		HomeData: func(lang string) viewmodel.HomePageData {

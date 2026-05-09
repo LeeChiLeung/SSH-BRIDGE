@@ -36,7 +36,7 @@ func newUIRouter(controller *TunnelController, store *ProfileStore, legacyURL st
 				Lang:        lang,
 				Title:       "Timber SSH Go",
 				Version:     currentBuildInfo().Version,
-				HomeURL:     withLangUI("/", lang),
+				HomeURL:     homeSelectedURL(lang, profile.ID),
 				EditURL:     withLangUI("/profiles/"+profile.ID+"/edit", lang),
 				LegacyURL:   legacyURL,
 				Card:        card,
