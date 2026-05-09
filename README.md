@@ -1,12 +1,13 @@
 # Timber SSH Go
 
-一个用 Go 编写的本地 SSH 隧道工具，支持本地端口转发、多实例 profile、本地 Web 控制台、系统托盘入口，以及 Linux/Windows 发布产物。
+一个用 Go 编写的本地 SSH 隧道工具，支持本地端口转发、多实例 profile、新旧两套本地 Web 控制台、系统托盘入口，以及 Linux/Windows 发布产物。
 
 当前项目适合这类场景：
 
 - 通过 SSH jump server 把本地端口转发到远端内网服务
-- 保存多套常用 tunnel profile，按卡片方式启停
+- 保存多套常用 tunnel profile，按列表/工作台方式启停
 - 在本地查看连接状态、重连日志、健康检查、上下行速度和累计流量
+- 通过 JSON 导入/导出 profile 配置
 - 打包成裸二进制、`.deb`、`AppImage`
 
 ## 核心能力
@@ -14,7 +15,7 @@
 - 本地端口转发：监听本地 TCP 端口，转发到 SSH 后面的目标地址
 - 连接保活：指数退避重连、SSH keepalive、半开连接检测
 - 多实例管理：同一进程内管理多个 tunnel profile
-- 本地 WebUI：新增、编辑、复制、删除、启动、停止 profile
+- 本地 WebUI：新增、编辑、复制、删除、启动、停止、导入、导出 profile
 - 系统托盘：打开控制台、退出程序
 - 运行指标：上下行速度、累计流量、活跃连接数、运行日志
 - 版本注入：`--version` 可输出版本、commit、构建时间
@@ -55,10 +56,16 @@ ssh -p 22 -N -C -L 127.0.0.1:15432:127.0.0.1:5432 user@ssh.example.com
 go run . --version
 ```
 
-启动本地 Web 控制台：
+启动旧版本地 Web 控制台：
 
 ```bash
 go run . --web
+```
+
+启动新版本地 Web 控制台：
+
+```bash
+go run . --web-new
 ```
 
 默认访问地址：
@@ -73,7 +80,12 @@ http://127.0.0.1:8848
 go run . --tray
 ```
 
-托盘模式会同时启动本地 Web 控制台，并在浏览器中通过托盘菜单打开 `http://127.0.0.1:8848`。
+托盘模式会同时启动：
+
+- 旧控制台：`http://127.0.0.1:8848`
+- 新控制台：`http://127.0.0.1:8849`
+
+托盘菜单中的“打开控制台”当前会打开新的控制台页面。
 
 ## 常用运行模式
 
@@ -112,23 +124,31 @@ eval "$(go run . \
 export TUNNEL_LOCAL_PORT=43017
 ```
 
-### 3. Web 控制台模式
+### 3. 旧版 Web 控制台模式
 
 ```bash
 go run . --web --web-addr 127.0.0.1:8848
 ```
 
-WebUI 当前提供：
+### 4. 新版 Web 控制台模式
+
+```bash
+go run . --web-new --web-addr 127.0.0.1:8848
+```
+
+新版 WebUI 当前提供：
 
 - tunnel profile 列表首页
-- 卡片式布局
+- 列表 + 下方工作台详情
 - 启动 / 停止
 - 编辑 / 复制 / 删除
+- 导入 / 导出 JSON 配置
 - 实时状态：`disconnected`、`connecting`、`connected`、`retrying`
+- 状态徽标颜色：未启动灰色、启动中蓝色、成功绿色、失败红色
 - 健康检查：监听状态、SSH 在线状态
 - 日志面板、流量统计、活跃连接数
 
-### 4. 托盘模式
+### 5. 托盘模式
 
 ```bash
 go run . --tray --web-addr 127.0.0.1:8848
@@ -138,6 +158,12 @@ go run . --tray --web-addr 127.0.0.1:8848
 
 - 打开控制台
 - 退出
+
+说明：
+
+- 托盘模式内部会同时拉起旧控制台和新控制台
+- 托盘入口当前默认打开新控制台
+- Windows 双击 `exe` 时默认进入托盘模式
 
 ## 主要 CLI 参数
 
@@ -152,6 +178,7 @@ go run . --tray --web-addr 127.0.0.1:8848
 - `--insecure-ignore-host-key`
 - `--env`
 - `--web`
+- `--web-new`
 - `--tray`
 - `--web-addr`
 - `--version`
@@ -173,9 +200,20 @@ WebUI 使用 profile 持久化保存常用隧道配置。
 
 说明：
 
-- 保存的是 profile 参数，不会持久化 SSH 密码或私钥内容
-- 会保存私钥路径
+- 会保存 profile 参数，包括 SSH 密码和私钥路径
+- 不会保存私钥文件内容本身
 - 会记录上次启用时间
+
+### JSON 导入导出
+
+新版控制台支持通过按钮导出全部 profile 为一个 JSON 文件，也支持从 JSON 文件导入。
+
+导入流程特点：
+
+- 导入前会先做预检查
+- 按隧道名称（title）识别冲突
+- 同名冲突时可选“跳过”或“合并”
+- 导入完成后会显示 added / merged / skipped / invalid 汇总结果
 
 ## 打包与发布
 
@@ -216,6 +254,11 @@ WebUI 使用 profile 持久化保存常用隧道配置。
 ```text
 dist/
 ```
+
+Windows 产物当前使用 GUI subsystem 构建：
+
+- 双击启动时不会弹出 `cmd` 控制台窗口
+- 默认双击行为会进入托盘模式
 
 ### 版本控制
 
