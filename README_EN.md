@@ -1,4 +1,4 @@
-# Timber SSH Go
+# SSH BRIDGE
 
 A local SSH tunneling tool written in Go, featuring local port forwarding, multi-instance profiles, dual Web consoles (Legacy & Modern), system tray integration, and distribution artifacts for Linux and Windows.
 

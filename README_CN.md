@@ -1,4 +1,4 @@
-# Timber SSH Go
+# SSH BRIDGE
 
 一个用 Go 编写的本地 SSH 隧道工具，支持本地端口转发、多实例 profile、新旧两套本地 Web 控制台、系统托盘入口，以及 Linux/Windows 发布产物。
 
