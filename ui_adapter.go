@@ -205,15 +205,16 @@ func buildFormData(profile Profile, isEdit bool, lang string) viewmodel.FormPage
 		ConnectTimeoutSec:  profile.ConnectTimeoutSec,
 		KnownHostsPath:     profile.KnownHostsPath,
 		InsecureIgnoreHost: profile.InsecureIgnoreHost,
+		AutoStart:          profile.AutoStart,
 	}
 }
 
 func buildImportModalData(lang string) viewmodel.ImportModalData {
 	return viewmodel.ImportModalData{
-		Lang:      lang,
-		Title:     "Timber SSH Go",
-		Version:   currentBuildInfo().Version,
-		CancelURL: withLangUI("/", lang),
+		Lang:       lang,
+		Title:      "Timber SSH Go",
+		Version:    currentBuildInfo().Version,
+		CancelURL:  withLangUI("/", lang),
 		PreviewURL: withLangUI("/profiles/import/preview", lang),
 		ConfirmURL: withLangUI("/profiles/import/confirm", lang),
 	}

@@ -23,6 +23,7 @@ func TestProfileStoreExportTransferJSON(t *testing.T) {
 		LocalAddr:         "127.0.0.1",
 		LocalPort:         13306,
 		ConnectTimeoutSec: 10,
+		AutoStart:         true,
 	}); err != nil {
 		t.Fatalf("Save: %v", err)
 	}
@@ -44,6 +45,9 @@ func TestProfileStoreExportTransferJSON(t *testing.T) {
 	}
 	if len(payload.Profiles) != 1 || payload.Profiles[0].Title != "数据库隧道" {
 		t.Fatalf("unexpected profiles payload: %+v", payload.Profiles)
+	}
+	if !payload.Profiles[0].AutoStart {
+		t.Fatal("exported AutoStart = false, want true")
 	}
 }
 
@@ -72,7 +76,7 @@ func TestProfileStorePreviewImportDetectsConflictsAndInvalid(t *testing.T) {
 		ExportedAt:    time.Now().UTC().Format(time.RFC3339),
 		Profiles: []ProfileTransferProfile{
 			{Title: "数据库隧道", SSHHost: "ssh2.example.com", SSHPort: 22, SSHUser: "root", SSHPassword: "x", RemoteHost: "127.0.0.1", RemotePort: 3307, LocalAddr: "127.0.0.1", LocalPort: 13307, ConnectTimeoutSec: 10},
-			{Title: "缓存隧道", SSHHost: "ssh3.example.com", SSHPort: 22, SSHUser: "root", SSHPassword: "y", RemoteHost: "127.0.0.1", RemotePort: 6379, LocalAddr: "127.0.0.1", LocalPort: 16379, ConnectTimeoutSec: 10},
+			{Title: "缓存隧道", SSHHost: "ssh3.example.com", SSHPort: 22, SSHUser: "root", SSHPassword: "y", RemoteHost: "127.0.0.1", RemotePort: 6379, LocalAddr: "127.0.0.1", LocalPort: 16379, ConnectTimeoutSec: 10, AutoStart: true},
 			{Title: "", SSHHost: "ssh4.example.com", SSHPort: 22, SSHUser: "root", SSHPassword: "z", RemoteHost: "127.0.0.1", RemotePort: 5432, LocalAddr: "127.0.0.1", LocalPort: 15432, ConnectTimeoutSec: 10},
 			{Title: "缓存隧道", SSHHost: "ssh5.example.com", SSHPort: 22, SSHUser: "root", SSHPassword: "w", RemoteHost: "127.0.0.1", RemotePort: 6380, LocalAddr: "127.0.0.1", LocalPort: 16380, ConnectTimeoutSec: 10},
 		},
@@ -87,6 +91,9 @@ func TestProfileStorePreviewImportDetectsConflictsAndInvalid(t *testing.T) {
 	}
 	if len(preview.Added) != 1 || preview.Added[0].Title != "缓存隧道" {
 		t.Fatalf("unexpected added: %+v", preview.Added)
+	}
+	if !preview.Added[0].AutoStart {
+		t.Fatal("preview added AutoStart = false, want true")
 	}
 	if len(preview.Invalid) != 2 {
 		t.Fatalf("invalid count = %d, want 2", len(preview.Invalid))
@@ -118,8 +125,8 @@ func TestProfileStoreApplyImportMergeAndSkip(t *testing.T) {
 		SchemaVersion: profileTransferSchemaVersion,
 		ExportedAt:    time.Now().UTC().Format(time.RFC3339),
 		Profiles: []ProfileTransferProfile{
-			{Title: "数据库隧道", SSHHost: "ssh2.example.com", SSHPort: 2222, SSHUser: "admin", SSHPassword: "override", RemoteHost: "10.0.0.1", RemotePort: 3307, LocalAddr: "127.0.0.1", LocalPort: 23307, ConnectTimeoutSec: 12},
-			{Title: "缓存隧道", SSHHost: "ssh3.example.com", SSHPort: 22, SSHUser: "root", SSHPassword: "new", RemoteHost: "127.0.0.1", RemotePort: 6379, LocalAddr: "127.0.0.1", LocalPort: 16379, ConnectTimeoutSec: 10},
+			{Title: "数据库隧道", SSHHost: "ssh2.example.com", SSHPort: 2222, SSHUser: "admin", SSHPassword: "override", RemoteHost: "10.0.0.1", RemotePort: 3307, LocalAddr: "127.0.0.1", LocalPort: 23307, ConnectTimeoutSec: 12, AutoStart: true},
+			{Title: "缓存隧道", SSHHost: "ssh3.example.com", SSHPort: 22, SSHUser: "root", SSHPassword: "new", RemoteHost: "127.0.0.1", RemotePort: 6379, LocalAddr: "127.0.0.1", LocalPort: 16379, ConnectTimeoutSec: 10, AutoStart: true},
 		},
 	}
 	data, _ := json.Marshal(payload)
@@ -157,5 +164,8 @@ func TestProfileStoreApplyImportMergeAndSkip(t *testing.T) {
 	}
 	if merged.SSHHost != "ssh2.example.com" || merged.LocalPort != 23307 {
 		t.Fatalf("merged profile not updated: %+v", merged)
+	}
+	if !merged.AutoStart {
+		t.Fatal("merged AutoStart = false, want true")
 	}
 }

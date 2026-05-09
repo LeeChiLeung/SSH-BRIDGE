@@ -30,6 +30,7 @@ type ProfileTransferProfile struct {
 	ConnectTimeoutSec  int        `json:"connectTimeoutSec"`
 	KnownHostsPath     string     `json:"knownHostsPath"`
 	InsecureIgnoreHost bool       `json:"insecureIgnoreHost"`
+	AutoStart          bool       `json:"autoStart"`
 	LastEnabledAt      *time.Time `json:"lastEnabledAt,omitempty"`
 }
 
@@ -46,10 +47,10 @@ type ProfileImportConflict struct {
 }
 
 type ProfileImportPreview struct {
-	SchemaVersion string                  `json:"schemaVersion"`
+	SchemaVersion string                   `json:"schemaVersion"`
 	Added         []ProfileTransferProfile `json:"added"`
-	Conflicts     []ProfileImportConflict `json:"conflicts"`
-	Invalid       []ProfileImportInvalid  `json:"invalid"`
+	Conflicts     []ProfileImportConflict  `json:"conflicts"`
+	Invalid       []ProfileImportInvalid   `json:"invalid"`
 }
 
 type ProfileImportResult struct {
@@ -86,6 +87,7 @@ func transferProfileFromProfile(profile Profile) ProfileTransferProfile {
 		ConnectTimeoutSec:  profile.ConnectTimeoutSec,
 		KnownHostsPath:     profile.KnownHostsPath,
 		InsecureIgnoreHost: profile.InsecureIgnoreHost,
+		AutoStart:          profile.AutoStart,
 		LastEnabledAt:      profile.LastEnabledAt,
 	}
 }
@@ -105,6 +107,7 @@ func profileFromTransferProfile(item ProfileTransferProfile) Profile {
 		ConnectTimeoutSec:  item.ConnectTimeoutSec,
 		KnownHostsPath:     strings.TrimSpace(item.KnownHostsPath),
 		InsecureIgnoreHost: item.InsecureIgnoreHost,
+		AutoStart:          item.AutoStart,
 		LastEnabledAt:      item.LastEnabledAt,
 	}
 }

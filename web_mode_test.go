@@ -32,6 +32,37 @@ func TestManagedWebModesSelectDifferentImplementations(t *testing.T) {
 	}
 }
 
+func TestManagedRuntimeCanBeSharedAcrossWebModes(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+
+	opts := cliOptions{
+		TunnelConfig: defaultTunnelConfig(),
+		WebAddr:      "127.0.0.1:18848",
+	}
+	logger := log.New(io.Discard, "", 0)
+
+	runtime, err := newManagedRuntime(opts, logger)
+	if err != nil {
+		t.Fatalf("newManagedRuntime: %v", err)
+	}
+	if runtime.store == nil || runtime.controller == nil {
+		t.Fatal("managed runtime is incomplete")
+	}
+
+	legacy, err := NewWebServer(opts.WebAddr, runtime.controller, runtime.store, logger)
+	if err != nil {
+		t.Fatalf("NewWebServer: %v", err)
+	}
+	modern := NewTemplWebServer("127.0.0.1:18849", newUIRouter(runtime.controller, runtime.store, ""))
+
+	if legacy.store != runtime.store || legacy.controller != runtime.controller {
+		t.Fatal("legacy web server does not share managed runtime")
+	}
+	if modern == nil {
+		t.Fatal("modern web server is nil")
+	}
+}
+
 func TestNextWebAddrUsesAdjacentPort(t *testing.T) {
 	got, err := nextWebAddr("127.0.0.1:8848")
 	if err != nil {

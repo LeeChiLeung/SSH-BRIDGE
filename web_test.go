@@ -23,6 +23,7 @@ func TestProfileFromRequestCapturesPassword(t *testing.T) {
 		"local_port":           {"15432"},
 		"connect_timeout_sec":  {"10"},
 		"known_hosts_path":     {"/tmp/known_hosts"},
+		"auto_start":           {"on"},
 		"insecure_ignore_host": {"on"},
 	}
 
@@ -38,6 +39,9 @@ func TestProfileFromRequestCapturesPassword(t *testing.T) {
 	}
 	if profile.SSHKeyPath != "~/.ssh/example_id_rsa" {
 		t.Fatalf("SSHKeyPath = %q", profile.SSHKeyPath)
+	}
+	if !profile.AutoStart {
+		t.Fatal("AutoStart = false, want true")
 	}
 }
 
@@ -62,6 +66,7 @@ func TestProfileStorePersistsPassword(t *testing.T) {
 		LocalPort:          15432,
 		ConnectTimeoutSec:  10,
 		KnownHostsPath:     "/tmp/known_hosts",
+		AutoStart:          true,
 		InsecureIgnoreHost: true,
 	})
 	if err != nil {
@@ -81,5 +86,8 @@ func TestProfileStorePersistsPassword(t *testing.T) {
 	}
 	if profile.TunnelConfig().SSHPassword != "secret" {
 		t.Fatalf("tunnel config SSHPassword = %q, want %q", profile.TunnelConfig().SSHPassword, "secret")
+	}
+	if !profile.AutoStart {
+		t.Fatal("reloaded AutoStart = false, want true")
 	}
 }

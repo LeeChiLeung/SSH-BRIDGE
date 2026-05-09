@@ -25,6 +25,7 @@ type Profile struct {
 	ConnectTimeoutSec  int        `json:"connectTimeoutSec"`
 	KnownHostsPath     string     `json:"knownHostsPath"`
 	InsecureIgnoreHost bool       `json:"insecureIgnoreHost"`
+	AutoStart          bool       `json:"autoStart"`
 	LastEnabledAt      *time.Time `json:"lastEnabledAt,omitempty"`
 }
 

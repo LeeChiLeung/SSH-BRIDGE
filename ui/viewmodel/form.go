@@ -24,4 +24,5 @@ type FormPageData struct {
 	ConnectTimeoutSec  int
 	KnownHostsPath     string
 	InsecureIgnoreHost bool
+	AutoStart          bool
 }

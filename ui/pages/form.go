@@ -40,6 +40,10 @@ func renderFormModal(data viewmodel.FormPageData) string {
 	if data.InsecureIgnoreHost {
 		checked = "checked"
 	}
+	autoStartChecked := ""
+	if data.AutoStart {
+		autoStartChecked = "checked"
+	}
 	return fmt.Sprintf(`<section class="modal-backdrop">
 <div class="modal-shell">
   <div class="modal-head">
@@ -55,6 +59,7 @@ func renderFormModal(data viewmodel.FormPageData) string {
     <input type="hidden" name="redirect_to" value="%s">
     <div class="grid">
       %s
+      <div class="field full check-field"><label><input type="checkbox" name="auto_start" %s><span>%s</span></label></div>
       <div class="field full check-field"><label><input type="checkbox" name="insecure_ignore_host" %s><span>%s</span></label></div>
     </div>
     <div class="actions-row">
@@ -73,6 +78,8 @@ func renderFormModal(data viewmodel.FormPageData) string {
 		template.HTMLEscapeString(data.Lang),
 		template.HTMLEscapeString(data.ReturnURL),
 		formFields(data, t),
+		autoStartChecked,
+		template.HTMLEscapeString(t.T("field.auto_start")),
 		checked,
 		template.HTMLEscapeString(t.T("field.ignore_host_key")),
 		template.HTMLEscapeString(data.CancelURL),

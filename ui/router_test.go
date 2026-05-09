@@ -77,13 +77,15 @@ func TestRouterRendersHomePage(t *testing.T) {
 		EditFormData: func(id string, lang string) (viewmodel.FormPageData, bool) {
 			return viewmodel.FormPageData{Lang: lang, Title: "Timber SSH Go", Version: "0.0.2", HomeURL: "/", CancelURL: "/profiles/" + id, PostURL: "/profiles/save", ProfileID: id, IsEdit: true, SSHPort: 22, LocalAddr: "127.0.0.1", LocalPort: 15432, RemoteHost: "127.0.0.1", RemotePort: 5432, ConnectTimeoutSec: 10}, true
 		},
-		SaveProfile:   func(r *http.Request) (string, error) { return "profile-1", nil },
-		StartProfile:  func(id string) error { return nil },
-		StopProfile:   func(id string) error { return nil },
-		DeleteProfile: func(id string) error { return nil },
+		SaveProfile:    func(r *http.Request) (string, error) { return "profile-1", nil },
+		StartProfile:   func(id string) error { return nil },
+		StopProfile:    func(id string) error { return nil },
+		DeleteProfile:  func(id string) error { return nil },
 		ExportProfiles: func() (string, []byte, error) { return "profiles.json", []byte("{}"), nil },
 		PreviewImport:  func(data []byte) (viewmodel.ImportModalData, error) { return viewmodel.ImportModalData{}, nil },
-		ApplyImport:    func(data []byte, policy string) (viewmodel.ImportResultData, error) { return viewmodel.ImportResultData{}, nil },
+		ApplyImport: func(data []byte, policy string) (viewmodel.ImportResultData, error) {
+			return viewmodel.ImportResultData{}, nil
+		},
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -109,16 +111,18 @@ func TestRouterSwitchesLanguage(t *testing.T) {
 		DetailData: func(id string, lang string) (viewmodel.DetailPageData, bool) {
 			return viewmodel.DetailPageData{}, false
 		},
-		NewFormData:   func(lang string) viewmodel.FormPageData { return viewmodel.FormPageData{} },
-		NewImportData: func(lang string) viewmodel.ImportModalData { return viewmodel.ImportModalData{} },
-		EditFormData:  func(id string, lang string) (viewmodel.FormPageData, bool) { return viewmodel.FormPageData{}, false },
-		SaveProfile:   func(r *http.Request) (string, error) { return "", nil },
-		StartProfile:  func(id string) error { return nil },
-		StopProfile:   func(id string) error { return nil },
-		DeleteProfile: func(id string) error { return nil },
+		NewFormData:    func(lang string) viewmodel.FormPageData { return viewmodel.FormPageData{} },
+		NewImportData:  func(lang string) viewmodel.ImportModalData { return viewmodel.ImportModalData{} },
+		EditFormData:   func(id string, lang string) (viewmodel.FormPageData, bool) { return viewmodel.FormPageData{}, false },
+		SaveProfile:    func(r *http.Request) (string, error) { return "", nil },
+		StartProfile:   func(id string) error { return nil },
+		StopProfile:    func(id string) error { return nil },
+		DeleteProfile:  func(id string) error { return nil },
 		ExportProfiles: func() (string, []byte, error) { return "profiles.json", []byte("{}"), nil },
 		PreviewImport:  func(data []byte) (viewmodel.ImportModalData, error) { return viewmodel.ImportModalData{}, nil },
-		ApplyImport:    func(data []byte, policy string) (viewmodel.ImportResultData, error) { return viewmodel.ImportResultData{}, nil },
+		ApplyImport: func(data []byte, policy string) (viewmodel.ImportResultData, error) {
+			return viewmodel.ImportResultData{}, nil
+		},
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/?lang=en", nil)
@@ -138,7 +142,9 @@ func TestRouterSwitchesLanguageToJapanese(t *testing.T) {
 		HomeData: func(lang string) viewmodel.HomePageData {
 			return viewmodel.HomePageData{Lang: lang, Title: "Timber SSH Go", Version: "0.0.2", HomeURL: "/", NewURL: "/profiles/new", ExportURL: "/profiles/export", ImportURL: "/profiles/import"}
 		},
-		DetailData:     func(id string, lang string) (viewmodel.DetailPageData, bool) { return viewmodel.DetailPageData{}, false },
+		DetailData: func(id string, lang string) (viewmodel.DetailPageData, bool) {
+			return viewmodel.DetailPageData{}, false
+		},
 		NewFormData:    func(lang string) viewmodel.FormPageData { return viewmodel.FormPageData{} },
 		NewImportData:  func(lang string) viewmodel.ImportModalData { return viewmodel.ImportModalData{} },
 		EditFormData:   func(id string, lang string) (viewmodel.FormPageData, bool) { return viewmodel.FormPageData{}, false },
@@ -148,7 +154,9 @@ func TestRouterSwitchesLanguageToJapanese(t *testing.T) {
 		DeleteProfile:  func(id string) error { return nil },
 		ExportProfiles: func() (string, []byte, error) { return "profiles.json", []byte("{}"), nil },
 		PreviewImport:  func(data []byte) (viewmodel.ImportModalData, error) { return viewmodel.ImportModalData{}, nil },
-		ApplyImport:    func(data []byte, policy string) (viewmodel.ImportResultData, error) { return viewmodel.ImportResultData{}, nil },
+		ApplyImport: func(data []byte, policy string) (viewmodel.ImportResultData, error) {
+			return viewmodel.ImportResultData{}, nil
+		},
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/?lang=ja", nil)
@@ -167,7 +175,9 @@ func TestRouterUsesCookieLanguageWithoutQuery(t *testing.T) {
 		HomeData: func(lang string) viewmodel.HomePageData {
 			return viewmodel.HomePageData{Lang: lang, Title: "Timber SSH Go", Version: "0.0.2", HomeURL: "/", NewURL: "/profiles/new", ExportURL: "/profiles/export", ImportURL: "/profiles/import"}
 		},
-		DetailData:     func(id string, lang string) (viewmodel.DetailPageData, bool) { return viewmodel.DetailPageData{}, false },
+		DetailData: func(id string, lang string) (viewmodel.DetailPageData, bool) {
+			return viewmodel.DetailPageData{}, false
+		},
 		NewFormData:    func(lang string) viewmodel.FormPageData { return viewmodel.FormPageData{} },
 		NewImportData:  func(lang string) viewmodel.ImportModalData { return viewmodel.ImportModalData{} },
 		EditFormData:   func(id string, lang string) (viewmodel.FormPageData, bool) { return viewmodel.FormPageData{}, false },
@@ -177,7 +187,9 @@ func TestRouterUsesCookieLanguageWithoutQuery(t *testing.T) {
 		DeleteProfile:  func(id string) error { return nil },
 		ExportProfiles: func() (string, []byte, error) { return "profiles.json", []byte("{}"), nil },
 		PreviewImport:  func(data []byte) (viewmodel.ImportModalData, error) { return viewmodel.ImportModalData{}, nil },
-		ApplyImport:    func(data []byte, policy string) (viewmodel.ImportResultData, error) { return viewmodel.ImportResultData{}, nil },
+		ApplyImport: func(data []byte, policy string) (viewmodel.ImportResultData, error) {
+			return viewmodel.ImportResultData{}, nil
+		},
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -196,11 +208,11 @@ func TestRouterRendersNewProfileAsModal(t *testing.T) {
 	app := NewApp(RouterDeps{
 		HomeData: func(lang string) viewmodel.HomePageData {
 			return viewmodel.HomePageData{
-				Lang:    lang,
-				Title:   "Timber SSH Go",
-				Version: "0.0.2",
-				HomeURL: "/",
-				NewURL:  "/profiles/new",
+				Lang:      lang,
+				Title:     "Timber SSH Go",
+				Version:   "0.0.2",
+				HomeURL:   "/",
+				NewURL:    "/profiles/new",
 				ExportURL: "/profiles/export",
 				ImportURL: "/profiles/import",
 				Cards: []viewmodel.ProfileCard{
@@ -215,14 +227,16 @@ func TestRouterRendersNewProfileAsModal(t *testing.T) {
 		NewFormData: func(lang string) viewmodel.FormPageData {
 			return viewmodel.FormPageData{Lang: lang, Version: "0.0.2", HomeURL: "/", CancelURL: "/", PostURL: "/profiles/save", SSHPort: 22, LocalAddr: "127.0.0.1", LocalPort: 15432, RemoteHost: "127.0.0.1", RemotePort: 5432, ConnectTimeoutSec: 10}
 		},
-		EditFormData:  func(id string, lang string) (viewmodel.FormPageData, bool) { return viewmodel.FormPageData{}, false },
-		SaveProfile:   func(r *http.Request) (string, error) { return "", nil },
-		StartProfile:  func(id string) error { return nil },
-		StopProfile:   func(id string) error { return nil },
-		DeleteProfile: func(id string) error { return nil },
+		EditFormData:   func(id string, lang string) (viewmodel.FormPageData, bool) { return viewmodel.FormPageData{}, false },
+		SaveProfile:    func(r *http.Request) (string, error) { return "", nil },
+		StartProfile:   func(id string) error { return nil },
+		StopProfile:    func(id string) error { return nil },
+		DeleteProfile:  func(id string) error { return nil },
 		ExportProfiles: func() (string, []byte, error) { return "profiles.json", []byte("{}"), nil },
 		PreviewImport:  func(data []byte) (viewmodel.ImportModalData, error) { return viewmodel.ImportModalData{}, nil },
-		ApplyImport:    func(data []byte, policy string) (viewmodel.ImportResultData, error) { return viewmodel.ImportResultData{}, nil },
+		ApplyImport: func(data []byte, policy string) (viewmodel.ImportResultData, error) {
+			return viewmodel.ImportResultData{}, nil
+		},
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/profiles/new", nil)
@@ -233,7 +247,7 @@ func TestRouterRendersNewProfileAsModal(t *testing.T) {
 		t.Fatalf("status = %d, want 200", rec.Code)
 	}
 	body := rec.Body.String()
-	for _, want := range []string{"modal-backdrop", "新增配置", "aria-label=\"关闭\"", "SSH BRIDGE"} {
+	for _, want := range []string{"modal-backdrop", "新增配置", "aria-label=\"关闭\"", "SSH BRIDGE", "应用启动时自动连接"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("response missing %q:\n%s", want, body)
 		}
@@ -284,11 +298,14 @@ func TestRouterRendersEditProfileAsModal(t *testing.T) {
 				RemoteHost:        "127.0.0.1",
 				RemotePort:        5432,
 				ConnectTimeoutSec: 10,
+				AutoStart:         true,
 			}, true
 		},
 		ExportProfiles: func() (string, []byte, error) { return "profiles.json", []byte("{}"), nil },
 		PreviewImport:  func(data []byte) (viewmodel.ImportModalData, error) { return viewmodel.ImportModalData{}, nil },
-		ApplyImport:    func(data []byte, policy string) (viewmodel.ImportResultData, error) { return viewmodel.ImportResultData{}, nil },
+		ApplyImport: func(data []byte, policy string) (viewmodel.ImportResultData, error) {
+			return viewmodel.ImportResultData{}, nil
+		},
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/profiles/profile-1/edit", nil)
@@ -299,7 +316,7 @@ func TestRouterRendersEditProfileAsModal(t *testing.T) {
 		t.Fatalf("status = %d, want 200", rec.Code)
 	}
 	body := rec.Body.String()
-	for _, want := range []string{"modal-backdrop", "编辑配置", "数据库隧道"} {
+	for _, want := range []string{"modal-backdrop", "编辑配置", "数据库隧道", "name=\"auto_start\" checked"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("response missing %q:\n%s", want, body)
 		}
@@ -310,11 +327,11 @@ func TestRouterRendersEmbeddedEditProfileModalWithHomeCancel(t *testing.T) {
 	app := NewApp(RouterDeps{
 		HomeData: func(lang string) viewmodel.HomePageData {
 			return viewmodel.HomePageData{
-				Lang:    lang,
-				Title:   "Timber SSH Go",
-				Version: "0.0.2",
-				HomeURL: "/",
-				NewURL:  "/profiles/new",
+				Lang:      lang,
+				Title:     "Timber SSH Go",
+				Version:   "0.0.2",
+				HomeURL:   "/",
+				NewURL:    "/profiles/new",
 				ExportURL: "/profiles/export",
 				ImportURL: "/profiles/import",
 				Cards: []viewmodel.ProfileCard{
@@ -322,15 +339,17 @@ func TestRouterRendersEmbeddedEditProfileModalWithHomeCancel(t *testing.T) {
 				},
 			}
 		},
-		NewFormData:   func(lang string) viewmodel.FormPageData { return viewmodel.FormPageData{} },
-		NewImportData: func(lang string) viewmodel.ImportModalData { return viewmodel.ImportModalData{} },
-		SaveProfile:   func(r *http.Request) (string, error) { return "", nil },
-		StartProfile:  func(id string) error { return nil },
-		StopProfile:   func(id string) error { return nil },
-		DeleteProfile: func(id string) error { return nil },
+		NewFormData:    func(lang string) viewmodel.FormPageData { return viewmodel.FormPageData{} },
+		NewImportData:  func(lang string) viewmodel.ImportModalData { return viewmodel.ImportModalData{} },
+		SaveProfile:    func(r *http.Request) (string, error) { return "", nil },
+		StartProfile:   func(id string) error { return nil },
+		StopProfile:    func(id string) error { return nil },
+		DeleteProfile:  func(id string) error { return nil },
 		ExportProfiles: func() (string, []byte, error) { return "profiles.json", []byte("{}"), nil },
 		PreviewImport:  func(data []byte) (viewmodel.ImportModalData, error) { return viewmodel.ImportModalData{}, nil },
-		ApplyImport:    func(data []byte, policy string) (viewmodel.ImportResultData, error) { return viewmodel.ImportResultData{}, nil },
+		ApplyImport: func(data []byte, policy string) (viewmodel.ImportResultData, error) {
+			return viewmodel.ImportResultData{}, nil
+		},
 		DetailData: func(id string, lang string) (viewmodel.DetailPageData, bool) {
 			return viewmodel.DetailPageData{
 				Lang:    lang,
@@ -375,20 +394,22 @@ func TestRouterRendersEmbeddedEditProfileModalWithHomeCancel(t *testing.T) {
 
 func TestRouterPreservesLanguageWhenSavingProfile(t *testing.T) {
 	app := NewApp(RouterDeps{
-		HomeData: func(lang string) viewmodel.HomePageData { return viewmodel.HomePageData{} },
+		HomeData:      func(lang string) viewmodel.HomePageData { return viewmodel.HomePageData{} },
 		NewImportData: func(lang string) viewmodel.ImportModalData { return viewmodel.ImportModalData{} },
 		DetailData: func(id string, lang string) (viewmodel.DetailPageData, bool) {
 			return viewmodel.DetailPageData{}, false
 		},
-		NewFormData:   func(lang string) viewmodel.FormPageData { return viewmodel.FormPageData{} },
-		EditFormData:  func(id string, lang string) (viewmodel.FormPageData, bool) { return viewmodel.FormPageData{}, false },
-		SaveProfile:   func(r *http.Request) (string, error) { return "profile-1", nil },
-		StartProfile:  func(id string) error { return nil },
-		StopProfile:   func(id string) error { return nil },
-		DeleteProfile: func(id string) error { return nil },
+		NewFormData:    func(lang string) viewmodel.FormPageData { return viewmodel.FormPageData{} },
+		EditFormData:   func(id string, lang string) (viewmodel.FormPageData, bool) { return viewmodel.FormPageData{}, false },
+		SaveProfile:    func(r *http.Request) (string, error) { return "profile-1", nil },
+		StartProfile:   func(id string) error { return nil },
+		StopProfile:    func(id string) error { return nil },
+		DeleteProfile:  func(id string) error { return nil },
 		ExportProfiles: func() (string, []byte, error) { return "profiles.json", []byte("{}"), nil },
 		PreviewImport:  func(data []byte) (viewmodel.ImportModalData, error) { return viewmodel.ImportModalData{}, nil },
-		ApplyImport:    func(data []byte, policy string) (viewmodel.ImportResultData, error) { return viewmodel.ImportResultData{}, nil },
+		ApplyImport: func(data []byte, policy string) (viewmodel.ImportResultData, error) {
+			return viewmodel.ImportResultData{}, nil
+		},
 	})
 
 	req := httptest.NewRequest(http.MethodPost, "/profiles/save", strings.NewReader("lang=en"))
@@ -406,20 +427,22 @@ func TestRouterPreservesLanguageWhenSavingProfile(t *testing.T) {
 
 func TestRouterSaveProfileSupportsCustomRedirect(t *testing.T) {
 	app := NewApp(RouterDeps{
-		HomeData: func(lang string) viewmodel.HomePageData { return viewmodel.HomePageData{} },
+		HomeData:      func(lang string) viewmodel.HomePageData { return viewmodel.HomePageData{} },
 		NewImportData: func(lang string) viewmodel.ImportModalData { return viewmodel.ImportModalData{} },
 		DetailData: func(id string, lang string) (viewmodel.DetailPageData, bool) {
 			return viewmodel.DetailPageData{}, false
 		},
-		NewFormData:   func(lang string) viewmodel.FormPageData { return viewmodel.FormPageData{} },
-		EditFormData:  func(id string, lang string) (viewmodel.FormPageData, bool) { return viewmodel.FormPageData{}, false },
-		SaveProfile:   func(r *http.Request) (string, error) { return "profile-1", nil },
-		StartProfile:  func(id string) error { return nil },
-		StopProfile:   func(id string) error { return nil },
-		DeleteProfile: func(id string) error { return nil },
+		NewFormData:    func(lang string) viewmodel.FormPageData { return viewmodel.FormPageData{} },
+		EditFormData:   func(id string, lang string) (viewmodel.FormPageData, bool) { return viewmodel.FormPageData{}, false },
+		SaveProfile:    func(r *http.Request) (string, error) { return "profile-1", nil },
+		StartProfile:   func(id string) error { return nil },
+		StopProfile:    func(id string) error { return nil },
+		DeleteProfile:  func(id string) error { return nil },
 		ExportProfiles: func() (string, []byte, error) { return "profiles.json", []byte("{}"), nil },
 		PreviewImport:  func(data []byte) (viewmodel.ImportModalData, error) { return viewmodel.ImportModalData{}, nil },
-		ApplyImport:    func(data []byte, policy string) (viewmodel.ImportResultData, error) { return viewmodel.ImportResultData{}, nil },
+		ApplyImport: func(data []byte, policy string) (viewmodel.ImportResultData, error) {
+			return viewmodel.ImportResultData{}, nil
+		},
 	})
 
 	req := httptest.NewRequest(http.MethodPost, "/profiles/save", strings.NewReader("lang=en&redirect_to=%2F%3Flang%3Den%26selected%3Dprofile-1"))
@@ -438,20 +461,22 @@ func TestRouterSaveProfileSupportsCustomRedirect(t *testing.T) {
 func TestRouterStartProfileRedirectsToDetail(t *testing.T) {
 	started := ""
 	app := NewApp(RouterDeps{
-		HomeData: func(lang string) viewmodel.HomePageData { return viewmodel.HomePageData{} },
+		HomeData:      func(lang string) viewmodel.HomePageData { return viewmodel.HomePageData{} },
 		NewImportData: func(lang string) viewmodel.ImportModalData { return viewmodel.ImportModalData{} },
 		DetailData: func(id string, lang string) (viewmodel.DetailPageData, bool) {
 			return viewmodel.DetailPageData{}, false
 		},
-		NewFormData:   func(lang string) viewmodel.FormPageData { return viewmodel.FormPageData{} },
-		EditFormData:  func(id string, lang string) (viewmodel.FormPageData, bool) { return viewmodel.FormPageData{}, false },
-		SaveProfile:   func(r *http.Request) (string, error) { return "", nil },
-		StartProfile:  func(id string) error { started = id; return nil },
-		StopProfile:   func(id string) error { return nil },
-		DeleteProfile: func(id string) error { return nil },
+		NewFormData:    func(lang string) viewmodel.FormPageData { return viewmodel.FormPageData{} },
+		EditFormData:   func(id string, lang string) (viewmodel.FormPageData, bool) { return viewmodel.FormPageData{}, false },
+		SaveProfile:    func(r *http.Request) (string, error) { return "", nil },
+		StartProfile:   func(id string) error { started = id; return nil },
+		StopProfile:    func(id string) error { return nil },
+		DeleteProfile:  func(id string) error { return nil },
 		ExportProfiles: func() (string, []byte, error) { return "profiles.json", []byte("{}"), nil },
 		PreviewImport:  func(data []byte) (viewmodel.ImportModalData, error) { return viewmodel.ImportModalData{}, nil },
-		ApplyImport:    func(data []byte, policy string) (viewmodel.ImportResultData, error) { return viewmodel.ImportResultData{}, nil },
+		ApplyImport: func(data []byte, policy string) (viewmodel.ImportResultData, error) {
+			return viewmodel.ImportResultData{}, nil
+		},
 	})
 
 	req := httptest.NewRequest(http.MethodPost, "/profiles/profile-1/start", strings.NewReader("lang=en"))
@@ -496,17 +521,19 @@ func TestRouterStartProfileSupportsCustomRedirect(t *testing.T) {
 
 func TestRouterRendersDiagnosticsFragment(t *testing.T) {
 	app := NewApp(RouterDeps{
-		HomeData:      func(lang string) viewmodel.HomePageData { return viewmodel.HomePageData{} },
-		NewImportData: func(lang string) viewmodel.ImportModalData { return viewmodel.ImportModalData{} },
-		NewFormData:   func(lang string) viewmodel.FormPageData { return viewmodel.FormPageData{} },
-		EditFormData:  func(id string, lang string) (viewmodel.FormPageData, bool) { return viewmodel.FormPageData{}, false },
-		SaveProfile:   func(r *http.Request) (string, error) { return "", nil },
-		StartProfile:  func(id string) error { return nil },
-		StopProfile:   func(id string) error { return nil },
-		DeleteProfile: func(id string) error { return nil },
+		HomeData:       func(lang string) viewmodel.HomePageData { return viewmodel.HomePageData{} },
+		NewImportData:  func(lang string) viewmodel.ImportModalData { return viewmodel.ImportModalData{} },
+		NewFormData:    func(lang string) viewmodel.FormPageData { return viewmodel.FormPageData{} },
+		EditFormData:   func(id string, lang string) (viewmodel.FormPageData, bool) { return viewmodel.FormPageData{}, false },
+		SaveProfile:    func(r *http.Request) (string, error) { return "", nil },
+		StartProfile:   func(id string) error { return nil },
+		StopProfile:    func(id string) error { return nil },
+		DeleteProfile:  func(id string) error { return nil },
 		ExportProfiles: func() (string, []byte, error) { return "profiles.json", []byte("{}"), nil },
 		PreviewImport:  func(data []byte) (viewmodel.ImportModalData, error) { return viewmodel.ImportModalData{}, nil },
-		ApplyImport:    func(data []byte, policy string) (viewmodel.ImportResultData, error) { return viewmodel.ImportResultData{}, nil },
+		ApplyImport: func(data []byte, policy string) (viewmodel.ImportResultData, error) {
+			return viewmodel.ImportResultData{}, nil
+		},
 		DetailData: func(id string, lang string) (viewmodel.DetailPageData, bool) {
 			return viewmodel.DetailPageData{
 				Lang: lang,
@@ -544,17 +571,19 @@ func TestRouterRendersDiagnosticsFragment(t *testing.T) {
 
 func TestRouterDetailActionsRedirectBackToSelectedHome(t *testing.T) {
 	app := NewApp(RouterDeps{
-		HomeData:      func(lang string) viewmodel.HomePageData { return viewmodel.HomePageData{} },
-		NewFormData:   func(lang string) viewmodel.FormPageData { return viewmodel.FormPageData{} },
-		NewImportData: func(lang string) viewmodel.ImportModalData { return viewmodel.ImportModalData{} },
-		EditFormData:  func(id string, lang string) (viewmodel.FormPageData, bool) { return viewmodel.FormPageData{}, false },
-		SaveProfile:   func(r *http.Request) (string, error) { return "", nil },
-		StartProfile:  func(id string) error { return nil },
-		StopProfile:   func(id string) error { return nil },
-		DeleteProfile: func(id string) error { return nil },
+		HomeData:       func(lang string) viewmodel.HomePageData { return viewmodel.HomePageData{} },
+		NewFormData:    func(lang string) viewmodel.FormPageData { return viewmodel.FormPageData{} },
+		NewImportData:  func(lang string) viewmodel.ImportModalData { return viewmodel.ImportModalData{} },
+		EditFormData:   func(id string, lang string) (viewmodel.FormPageData, bool) { return viewmodel.FormPageData{}, false },
+		SaveProfile:    func(r *http.Request) (string, error) { return "", nil },
+		StartProfile:   func(id string) error { return nil },
+		StopProfile:    func(id string) error { return nil },
+		DeleteProfile:  func(id string) error { return nil },
 		ExportProfiles: func() (string, []byte, error) { return "profiles.json", []byte("{}"), nil },
 		PreviewImport:  func(data []byte) (viewmodel.ImportModalData, error) { return viewmodel.ImportModalData{}, nil },
-		ApplyImport:    func(data []byte, policy string) (viewmodel.ImportResultData, error) { return viewmodel.ImportResultData{}, nil },
+		ApplyImport: func(data []byte, policy string) (viewmodel.ImportResultData, error) {
+			return viewmodel.ImportResultData{}, nil
+		},
 		DetailData: func(id string, lang string) (viewmodel.DetailPageData, bool) {
 			return viewmodel.DetailPageData{
 				Lang:      lang,
@@ -598,9 +627,13 @@ func TestRouterRendersImportModal(t *testing.T) {
 		HomeData: func(lang string) viewmodel.HomePageData {
 			return viewmodel.HomePageData{Lang: lang, Title: "Timber SSH Go", Version: "0.0.2", HomeURL: "/", NewURL: "/profiles/new", ExportURL: "/profiles/export", ImportURL: "/profiles/import"}
 		},
-		DetailData:     func(id string, lang string) (viewmodel.DetailPageData, bool) { return viewmodel.DetailPageData{}, false },
-		NewFormData:    func(lang string) viewmodel.FormPageData { return viewmodel.FormPageData{} },
-		NewImportData:  func(lang string) viewmodel.ImportModalData { return viewmodel.ImportModalData{Lang: lang, CancelURL: "/", PreviewURL: "/profiles/import/preview"} },
+		DetailData: func(id string, lang string) (viewmodel.DetailPageData, bool) {
+			return viewmodel.DetailPageData{}, false
+		},
+		NewFormData: func(lang string) viewmodel.FormPageData { return viewmodel.FormPageData{} },
+		NewImportData: func(lang string) viewmodel.ImportModalData {
+			return viewmodel.ImportModalData{Lang: lang, CancelURL: "/", PreviewURL: "/profiles/import/preview"}
+		},
 		EditFormData:   func(id string, lang string) (viewmodel.FormPageData, bool) { return viewmodel.FormPageData{}, false },
 		SaveProfile:    func(r *http.Request) (string, error) { return "", nil },
 		StartProfile:   func(id string) error { return nil },
@@ -608,7 +641,9 @@ func TestRouterRendersImportModal(t *testing.T) {
 		DeleteProfile:  func(id string) error { return nil },
 		ExportProfiles: func() (string, []byte, error) { return "profiles.json", []byte("{}"), nil },
 		PreviewImport:  func(data []byte) (viewmodel.ImportModalData, error) { return viewmodel.ImportModalData{}, nil },
-		ApplyImport:    func(data []byte, policy string) (viewmodel.ImportResultData, error) { return viewmodel.ImportResultData{}, nil },
+		ApplyImport: func(data []byte, policy string) (viewmodel.ImportResultData, error) {
+			return viewmodel.ImportResultData{}, nil
+		},
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/profiles/import", nil)
@@ -624,8 +659,10 @@ func TestRouterRendersImportModal(t *testing.T) {
 
 func TestRouterExportsProfiles(t *testing.T) {
 	app := NewApp(RouterDeps{
-		HomeData:       func(lang string) viewmodel.HomePageData { return viewmodel.HomePageData{} },
-		DetailData:     func(id string, lang string) (viewmodel.DetailPageData, bool) { return viewmodel.DetailPageData{}, false },
+		HomeData: func(lang string) viewmodel.HomePageData { return viewmodel.HomePageData{} },
+		DetailData: func(id string, lang string) (viewmodel.DetailPageData, bool) {
+			return viewmodel.DetailPageData{}, false
+		},
 		NewFormData:    func(lang string) viewmodel.FormPageData { return viewmodel.FormPageData{} },
 		NewImportData:  func(lang string) viewmodel.ImportModalData { return viewmodel.ImportModalData{} },
 		EditFormData:   func(id string, lang string) (viewmodel.FormPageData, bool) { return viewmodel.FormPageData{}, false },
@@ -635,7 +672,9 @@ func TestRouterExportsProfiles(t *testing.T) {
 		DeleteProfile:  func(id string) error { return nil },
 		ExportProfiles: func() (string, []byte, error) { return "profiles.json", []byte(`{"ok":true}`), nil },
 		PreviewImport:  func(data []byte) (viewmodel.ImportModalData, error) { return viewmodel.ImportModalData{}, nil },
-		ApplyImport:    func(data []byte, policy string) (viewmodel.ImportResultData, error) { return viewmodel.ImportResultData{}, nil },
+		ApplyImport: func(data []byte, policy string) (viewmodel.ImportResultData, error) {
+			return viewmodel.ImportResultData{}, nil
+		},
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/profiles/export", nil)
@@ -654,7 +693,9 @@ func TestRouterImportConfirmShowsSummary(t *testing.T) {
 		HomeData: func(lang string) viewmodel.HomePageData {
 			return viewmodel.HomePageData{Lang: lang, Title: "Timber SSH Go", Version: "0.0.2", HomeURL: "/", NewURL: "/profiles/new", ExportURL: "/profiles/export", ImportURL: "/profiles/import"}
 		},
-		DetailData:     func(id string, lang string) (viewmodel.DetailPageData, bool) { return viewmodel.DetailPageData{}, false },
+		DetailData: func(id string, lang string) (viewmodel.DetailPageData, bool) {
+			return viewmodel.DetailPageData{}, false
+		},
 		NewFormData:    func(lang string) viewmodel.FormPageData { return viewmodel.FormPageData{} },
 		NewImportData:  func(lang string) viewmodel.ImportModalData { return viewmodel.ImportModalData{} },
 		EditFormData:   func(id string, lang string) (viewmodel.FormPageData, bool) { return viewmodel.FormPageData{}, false },

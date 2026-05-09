@@ -203,19 +203,22 @@ func runNewWebMode(opts cliOptions, logger *log.Logger) error {
 }
 
 func runTrayMode(opts cliOptions, logger *log.Logger) error {
-	legacy, err := newManagedWebMode(opts, logger)
+	runtime, err := newManagedRuntime(opts, logger)
 	if err != nil {
 		return err
 	}
+	legacyServer, err := NewWebServer(opts.WebAddr, runtime.controller, runtime.store, logger)
+	if err != nil {
+		return err
+	}
+	legacy := &managedWebMode{server: legacyServer, webAddr: opts.WebAddr}
 	newAddr, err := nextWebAddr(opts.WebAddr)
 	if err != nil {
 		return err
 	}
-	newOpts := opts
-	newOpts.WebAddr = newAddr
-	modern, err := newManagedNewWebMode(newOpts, logger)
-	if err != nil {
-		return err
+	modern := &managedWebMode{
+		server:  NewTemplWebServer(newAddr, newUIRouter(runtime.controller, runtime.store, "")),
+		webAddr: newAddr,
 	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -282,6 +285,11 @@ type managedWebMode struct {
 	webAddr string
 }
 
+type managedRuntime struct {
+	store      *ProfileStore
+	controller *TunnelController
+}
+
 type webRunner interface {
 	Run(ctx context.Context) error
 }
@@ -290,7 +298,7 @@ func (m *managedWebMode) webURL() string {
 	return "http://" + m.webAddr
 }
 
-func newManagedWebMode(opts cliOptions, logger *log.Logger) (*managedWebMode, error) {
+func newManagedRuntime(opts cliOptions, logger *log.Logger) (*managedRuntime, error) {
 	store, err := NewProfileStore(defaultProfileStorePath())
 	if err != nil {
 		return nil, err
@@ -298,9 +306,20 @@ func newManagedWebMode(opts cliOptions, logger *log.Logger) (*managedWebMode, er
 	if _, err := store.EnsureDefault(opts.TunnelConfig); err != nil {
 		return nil, err
 	}
-
 	controller := NewTunnelController(logger, store)
-	server, err := NewWebServer(opts.WebAddr, controller, store, logger)
+	startAutoStartProfiles(controller, store, logger)
+	return &managedRuntime{
+		store:      store,
+		controller: controller,
+	}, nil
+}
+
+func newManagedWebMode(opts cliOptions, logger *log.Logger) (*managedWebMode, error) {
+	runtime, err := newManagedRuntime(opts, logger)
+	if err != nil {
+		return nil, err
+	}
+	server, err := NewWebServer(opts.WebAddr, runtime.controller, runtime.store, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -308,17 +327,32 @@ func newManagedWebMode(opts cliOptions, logger *log.Logger) (*managedWebMode, er
 }
 
 func newManagedNewWebMode(opts cliOptions, logger *log.Logger) (*managedWebMode, error) {
-	store, err := NewProfileStore(defaultProfileStorePath())
+	runtime, err := newManagedRuntime(opts, logger)
 	if err != nil {
 		return nil, err
 	}
-	if _, err := store.EnsureDefault(opts.TunnelConfig); err != nil {
-		return nil, err
-	}
-
-	controller := NewTunnelController(logger, store)
-	server := NewTemplWebServer(opts.WebAddr, newUIRouter(controller, store, ""))
+	server := NewTemplWebServer(opts.WebAddr, newUIRouter(runtime.controller, runtime.store, ""))
 	return &managedWebMode{server: server, webAddr: opts.WebAddr}, nil
+}
+
+func startAutoStartProfiles(controller *TunnelController, store *ProfileStore, logger *log.Logger) {
+	if controller == nil || store == nil {
+		return
+	}
+	for _, profile := range store.List() {
+		if !profile.AutoStart {
+			continue
+		}
+		if err := controller.Start(profile.ID, profile.TunnelConfig()); err != nil {
+			if logger != nil {
+				logger.Printf("autostart profile %q failed: %v", profile.Title, err)
+			}
+			continue
+		}
+		if logger != nil {
+			logger.Printf("autostart profile %q queued", profile.Title)
+		}
+	}
 }
 
 func nextWebAddr(addr string) (string, error) {

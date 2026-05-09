@@ -434,6 +434,7 @@ func profileFromRequest(r *http.Request) (Profile, error) {
 		LocalAddr:          strings.TrimSpace(r.FormValue("local_addr")),
 		KnownHostsPath:     strings.TrimSpace(r.FormValue("known_hosts_path")),
 		InsecureIgnoreHost: r.FormValue("insecure_ignore_host") == "on",
+		AutoStart:          r.FormValue("auto_start") == "on",
 	}
 
 	var err error
@@ -804,6 +805,7 @@ const webTemplates = `
         <div class="form-field"><label>远程端口</label><input name="remote_port" value="{{.Profile.RemotePort}}"></div>
         <div class="form-field"><label>超时秒数</label><input name="connect_timeout_sec" value="{{if .Profile.ConnectTimeoutSec}}{{.Profile.ConnectTimeoutSec}}{{else}}10{{end}}"></div>
         <div class="form-field"><label>Known Hosts 路径</label><input name="known_hosts_path" value="{{.Profile.KnownHostsPath}}"></div>
+        <div class="form-field full"><label><input type="checkbox" name="auto_start" {{if .Profile.AutoStart}}checked{{end}}> 应用启动时自动连接</label></div>
         <div class="form-field full"><label><input type="checkbox" name="insecure_ignore_host" {{if .Profile.InsecureIgnoreHost}}checked{{end}}> 忽略 Host Key 校验</label></div>
       </div>
       <div class="form-actions">
