@@ -135,6 +135,9 @@ build_target() {
   local ldflags
   out="$(binary_path "$os" "$arch")"
   ldflags="-X main.buildVersion=$VERSION -X main.buildCommit=$BUILD_COMMIT -X main.buildDate=$BUILD_DATE"
+  if [[ "$os" == "windows" ]]; then
+    ldflags="$ldflags -H=windowsgui"
+  fi
   ensure_dir "$DIST_DIR"
   log "building $os/$arch -> $out"
   GOOS="$os" GOARCH="$arch" CGO_ENABLED=0 go build $GOFLAGS_RELEASE -ldflags "$ldflags" -o "$out" .
