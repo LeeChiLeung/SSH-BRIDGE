@@ -163,6 +163,27 @@ func TestResolveTrayIconFallsBackWhenFileMissing(t *testing.T) {
 	}
 }
 
+func TestTrayIconCandidatesForWindowsPreferICO(t *testing.T) {
+	t.Parallel()
+
+	paths := trayIconCandidatesForOS("windows")
+	if len(paths) == 0 {
+		t.Fatal("expected windows tray icon candidates")
+	}
+	if paths[0] != "icon/32x32.ico" {
+		t.Fatalf("first windows icon candidate = %q, want %q", paths[0], "icon/32x32.ico")
+	}
+}
+
+func TestResolveTrayIconForWindowsUsesEmbeddedICO(t *testing.T) {
+	t.Parallel()
+
+	iconData := resolveTrayIconForOS("windows")
+	if len(iconData) == 0 {
+		t.Fatal("expected windows tray icon data")
+	}
+}
+
 type fakeTrayManager struct {
 	mu        sync.Mutex
 	ready     chan struct{}

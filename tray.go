@@ -18,6 +18,9 @@ import (
 //go:embed icon/32x32.png
 var embeddedCustomTrayIcon []byte
 
+//go:embed icon/32x32.ico
+var embeddedWindowsTrayIcon []byte
+
 const (
 	trayOpenNewConsole   = "打开控制台"
 	trayQuitLabel        = "退出"
@@ -105,11 +108,18 @@ func (a *trayApp) openURL(url string) {
 }
 
 func resolveTrayIcon() []byte {
-	for _, path := range trayIconCandidates() {
+	return resolveTrayIconForOS(runtime.GOOS)
+}
+
+func resolveTrayIconForOS(goos string) []byte {
+	for _, path := range trayIconCandidatesForOS(goos) {
 		iconData, err := loadTrayIcon(path)
 		if err == nil && len(iconData) > 0 {
 			return iconData
 		}
+	}
+	if goos == "windows" && len(embeddedWindowsTrayIcon) > 0 {
+		return embeddedWindowsTrayIcon
 	}
 	if len(embeddedCustomTrayIcon) > 0 {
 		return embeddedCustomTrayIcon
@@ -118,15 +128,36 @@ func resolveTrayIcon() []byte {
 }
 
 func trayIconCandidates() []string {
-	paths := []string{filepath.Join("icon", "32x32.png")}
+	return trayIconCandidatesForOS(runtime.GOOS)
+}
+
+func trayIconCandidatesForOS(goos string) []string {
+	var paths []string
+	if goos == "windows" {
+		paths = []string{
+			filepath.Join("icon", "32x32.ico"),
+			filepath.Join("icon", "48x48.ico"),
+			filepath.Join("icon", "64x64.ico"),
+		}
+	} else {
+		paths = []string{filepath.Join("icon", "32x32.png")}
+	}
 	exePath, err := os.Executable()
 	if err != nil {
 		return paths
 	}
 
 	exeDir := filepath.Dir(exePath)
-	paths = append(paths, filepath.Join(exeDir, "icon", "32x32.png"))
-	paths = append(paths, filepath.Join(exeDir, "..", "share", "icons", "hicolor", "32x32", "apps", "timber-ssh-go.png"))
+	if goos == "windows" {
+		paths = append(paths,
+			filepath.Join(exeDir, "icon", "32x32.ico"),
+			filepath.Join(exeDir, "icon", "48x48.ico"),
+			filepath.Join(exeDir, "icon", "64x64.ico"),
+		)
+	} else {
+		paths = append(paths, filepath.Join(exeDir, "icon", "32x32.png"))
+		paths = append(paths, filepath.Join(exeDir, "..", "share", "icons", "hicolor", "32x32", "apps", "timber-ssh-go.png"))
+	}
 	return paths
 }
 
