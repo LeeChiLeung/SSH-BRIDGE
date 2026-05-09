@@ -4,6 +4,7 @@ type DetailPageData struct {
 	Lang      string
 	Title     string
 	Version   string
+	CurrentURL string
 	HomeURL   string
 	EditURL   string
 	LegacyURL string

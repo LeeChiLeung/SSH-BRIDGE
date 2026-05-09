@@ -47,7 +47,7 @@ func renderFormModal(data viewmodel.FormPageData) string {
       <h2>%s</h2>
       <p class="notice">%s</p>
     </div>
-    <a class="link" href="%s">%s</a>
+    <a class="link" href="%s" aria-label="%s">X</a>
   </div>
   <form class="modal-body" action="%s" method="post">
     <input type="hidden" name="id" value="%s">

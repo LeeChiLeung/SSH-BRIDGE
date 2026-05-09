@@ -16,11 +16,13 @@ func renderImportModal(data viewmodel.ImportModalData) string {
 	b.WriteString(fmt.Sprintf(`<h2>%s</h2>`, template.HTMLEscapeString(t.T("import.title"))))
 	if data.OverwriteNotice != "" {
 		b.WriteString(fmt.Sprintf(`<p class="notice warn">%s</p>`, template.HTMLEscapeString(data.OverwriteNotice)))
+	} else if data.HasConflicts {
+		b.WriteString(fmt.Sprintf(`<p class="notice warn">%s</p>`, template.HTMLEscapeString(t.T("import.overwrite_notice"))))
 	} else {
 		b.WriteString(fmt.Sprintf(`<p class="notice">%s</p>`, template.HTMLEscapeString(t.T("import.notice"))))
 	}
 	b.WriteString(`</div>`)
-	b.WriteString(fmt.Sprintf(`<a class="link" href="%s">%s</a></div>`, template.HTMLEscapeString(data.CancelURL), template.HTMLEscapeString(t.T("form.close"))))
+	b.WriteString(fmt.Sprintf(`<a class="link" href="%s" aria-label="%s">X</a></div>`, template.HTMLEscapeString(data.CancelURL), template.HTMLEscapeString(t.T("form.close"))))
 
 	if !data.HasPreview {
 		b.WriteString(fmt.Sprintf(`<form class="modal-body" action="%s" method="post" enctype="multipart/form-data">`, template.HTMLEscapeString(data.PreviewURL)))

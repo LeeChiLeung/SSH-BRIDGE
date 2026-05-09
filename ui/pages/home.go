@@ -24,7 +24,7 @@ func Home(data viewmodel.HomePageData) templ.Component {
   <title>%s</title>
   <style>%s</style>
 </head>
-<body>
+	<body>
   <main class="page">
     <section class="hero">
       <div><h1>%s</h1></div>
@@ -39,8 +39,8 @@ func Home(data viewmodel.HomePageData) templ.Component {
 			template.HTMLEscapeString(data.Lang),
 			template.HTMLEscapeString(data.Title),
 			baseStyles(),
-			template.HTMLEscapeString(data.Title),
-			languageSwitcher(data.HomeURL, data.Lang, t),
+			template.HTMLEscapeString(t.T("app.brand")),
+			languageSwitcher(orFallback(data.CurrentURL, data.HomeURL), data.Lang, t),
 			template.HTMLEscapeString(data.ExportURL),
 			template.HTMLEscapeString(t.T("home.export")),
 			template.HTMLEscapeString(data.ImportURL),
@@ -96,7 +96,7 @@ func Home(data viewmodel.HomePageData) templ.Component {
 }
 
 func renderImportResult(data viewmodel.ImportResultData, t i18n.Translator) string {
-	return fmt.Sprintf(`<section class="import-result"><strong>%s</strong> %s %d，%s %d，%s %d，%s %d。</section>`,
+	return fmt.Sprintf(`<section class="import-result"><strong>%s</strong> %s %d, %s %d, %s %d, %s %d.</section>`,
 		template.HTMLEscapeString(t.T("import.result_title")),
 		template.HTMLEscapeString(t.T("import.added")),
 		data.Added,

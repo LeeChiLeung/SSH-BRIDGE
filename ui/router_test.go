@@ -128,6 +128,68 @@ func TestRouterSwitchesLanguage(t *testing.T) {
 	if !strings.Contains(body, "New Profile") || !strings.Contains(body, "Refresh") {
 		t.Fatalf("english response missing translated text:\n%s", body)
 	}
+	if cookie := rec.Header().Get("Set-Cookie"); !strings.Contains(cookie, "timber_lang=en") {
+		t.Fatalf("Set-Cookie = %q, want timber_lang=en", cookie)
+	}
+}
+
+func TestRouterSwitchesLanguageToJapanese(t *testing.T) {
+	app := NewApp(RouterDeps{
+		HomeData: func(lang string) viewmodel.HomePageData {
+			return viewmodel.HomePageData{Lang: lang, Title: "Timber SSH Go", Version: "0.0.2", HomeURL: "/", NewURL: "/profiles/new", ExportURL: "/profiles/export", ImportURL: "/profiles/import"}
+		},
+		DetailData:     func(id string, lang string) (viewmodel.DetailPageData, bool) { return viewmodel.DetailPageData{}, false },
+		NewFormData:    func(lang string) viewmodel.FormPageData { return viewmodel.FormPageData{} },
+		NewImportData:  func(lang string) viewmodel.ImportModalData { return viewmodel.ImportModalData{} },
+		EditFormData:   func(id string, lang string) (viewmodel.FormPageData, bool) { return viewmodel.FormPageData{}, false },
+		SaveProfile:    func(r *http.Request) (string, error) { return "", nil },
+		StartProfile:   func(id string) error { return nil },
+		StopProfile:    func(id string) error { return nil },
+		DeleteProfile:  func(id string) error { return nil },
+		ExportProfiles: func() (string, []byte, error) { return "profiles.json", []byte("{}"), nil },
+		PreviewImport:  func(data []byte) (viewmodel.ImportModalData, error) { return viewmodel.ImportModalData{}, nil },
+		ApplyImport:    func(data []byte, policy string) (viewmodel.ImportResultData, error) { return viewmodel.ImportResultData{}, nil },
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/?lang=ja", nil)
+	rec := httptest.NewRecorder()
+	app.Router().ServeHTTP(rec, req)
+	body := rec.Body.String()
+	for _, want := range []string{"新規プロファイル", "更新", "日本語"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("japanese response missing %q:\n%s", want, body)
+		}
+	}
+}
+
+func TestRouterUsesCookieLanguageWithoutQuery(t *testing.T) {
+	app := NewApp(RouterDeps{
+		HomeData: func(lang string) viewmodel.HomePageData {
+			return viewmodel.HomePageData{Lang: lang, Title: "Timber SSH Go", Version: "0.0.2", HomeURL: "/", NewURL: "/profiles/new", ExportURL: "/profiles/export", ImportURL: "/profiles/import"}
+		},
+		DetailData:     func(id string, lang string) (viewmodel.DetailPageData, bool) { return viewmodel.DetailPageData{}, false },
+		NewFormData:    func(lang string) viewmodel.FormPageData { return viewmodel.FormPageData{} },
+		NewImportData:  func(lang string) viewmodel.ImportModalData { return viewmodel.ImportModalData{} },
+		EditFormData:   func(id string, lang string) (viewmodel.FormPageData, bool) { return viewmodel.FormPageData{}, false },
+		SaveProfile:    func(r *http.Request) (string, error) { return "", nil },
+		StartProfile:   func(id string) error { return nil },
+		StopProfile:    func(id string) error { return nil },
+		DeleteProfile:  func(id string) error { return nil },
+		ExportProfiles: func() (string, []byte, error) { return "profiles.json", []byte("{}"), nil },
+		PreviewImport:  func(data []byte) (viewmodel.ImportModalData, error) { return viewmodel.ImportModalData{}, nil },
+		ApplyImport:    func(data []byte, policy string) (viewmodel.ImportResultData, error) { return viewmodel.ImportResultData{}, nil },
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.AddCookie(&http.Cookie{Name: localeCookieName, Value: "ja"})
+	rec := httptest.NewRecorder()
+	app.Router().ServeHTTP(rec, req)
+	body := rec.Body.String()
+	for _, want := range []string{"新規プロファイル", "更新"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("cookie-driven response missing %q:\n%s", want, body)
+		}
+	}
 }
 
 func TestRouterRendersNewProfileAsModal(t *testing.T) {

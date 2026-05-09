@@ -24,7 +24,7 @@ func Detail(data viewmodel.DetailPageData) templ.Component {
 <html lang="%s"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>%s</title><style>%s</style></head><body><main class="page">
 <section class="hero"><div><h1>%s</h1><p>%s</p></div>
-<div class="actions">%s <a class="link primary" href="%s">%s</a></div></section>
+<div class="actions">%s %s <a class="link primary" href="%s">%s</a></div></section>
 %s
 <section class="card detail-card"><dl>
 <div><dt>%s</dt><dd>%s</dd></div>
@@ -41,6 +41,7 @@ func Detail(data viewmodel.DetailPageData) templ.Component {
 			baseStyles(),
 			template.HTMLEscapeString(data.Card.Title),
 			template.HTMLEscapeString(t.T("detail.title")),
+			languageSwitcher(orFallback(data.CurrentURL, data.HomeURL), data.Lang, t),
 			detailActions(data, t),
 			template.HTMLEscapeString(data.HomeURL),
 			template.HTMLEscapeString(t.T("detail.back")),

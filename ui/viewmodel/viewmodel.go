@@ -4,6 +4,7 @@ type HomePageData struct {
 	Title          string
 	Version        string
 	Lang           string
+	CurrentURL     string
 	HomeURL        string
 	NewURL         string
 	ExportURL      string

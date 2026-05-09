@@ -224,7 +224,6 @@ func buildImportPreviewModalData(preview ProfileImportPreview, raw []byte, lang 
 	modal.HasPreview = true
 	modal.HasConflicts = len(preview.Conflicts) > 0
 	modal.PayloadBase64 = encodeImportPayload(raw)
-	modal.OverwriteNotice = "合并会使用导入文件覆盖现有配置字段，跳过会保留本地同名配置。"
 	for _, item := range preview.Added {
 		modal.AddedTitles = append(modal.AddedTitles, item.Title)
 	}

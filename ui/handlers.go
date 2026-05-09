@@ -7,14 +7,21 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
+	"timber-ssh-go/ui/i18n"
 	"timber-ssh-go/ui/pages"
 )
 
+const localeCookieName = "timber_lang"
+
 func (a *App) handleHome(w http.ResponseWriter, r *http.Request) {
-	data := a.deps.HomeData(languageFromRequest(r))
+	lang := resolvedLanguage(r)
+	persistLanguagePreference(w, lang)
+	data := a.deps.HomeData(lang)
+	data.CurrentURL = currentRequestURL(r, lang)
 	selectedID := r.URL.Query().Get("selected")
 	if selectedID == "" && len(data.Cards) > 0 {
 		selectedID = profileIDFromDetailURL(data.Cards[0].DetailURL)
@@ -25,9 +32,10 @@ func (a *App) handleHome(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if selectedID != "" {
-		if detail, ok := a.deps.DetailData(selectedID, languageFromRequest(r)); ok {
-			returnURL := selectedHomeURL(languageFromRequest(r), selectedID)
+		if detail, ok := a.deps.DetailData(selectedID, lang); ok {
+			returnURL := selectedHomeURL(lang, selectedID)
 			detail.EditURL = appendRedirect(detail.EditURL, returnURL)
+			detail.CurrentURL = currentRequestURL(r, lang)
 			data.SelectedDetail = &detail
 		}
 	}
@@ -38,11 +46,14 @@ func (a *App) handleHome(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handleDetail(w http.ResponseWriter, r *http.Request) {
-	data, ok := a.deps.DetailData(chi.URLParam(r, "id"), languageFromRequest(r))
+	lang := resolvedLanguage(r)
+	persistLanguagePreference(w, lang)
+	data, ok := a.deps.DetailData(chi.URLParam(r, "id"), lang)
 	if !ok {
 		http.NotFound(w, r)
 		return
 	}
+	data.CurrentURL = currentRequestURL(r, lang)
 	data.ErrorMessage = r.URL.Query().Get("error")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := pages.Detail(data).Render(r.Context(), w); err != nil {
@@ -51,7 +62,9 @@ func (a *App) handleDetail(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handleDiagnostics(w http.ResponseWriter, r *http.Request) {
-	data, ok := a.deps.DetailData(chi.URLParam(r, "id"), languageFromRequest(r))
+	lang := resolvedLanguage(r)
+	persistLanguagePreference(w, lang)
+	data, ok := a.deps.DetailData(chi.URLParam(r, "id"), lang)
 	if !ok {
 		http.NotFound(w, r)
 		return
@@ -63,10 +76,13 @@ func (a *App) handleDiagnostics(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handleNewProfile(w http.ResponseWriter, r *http.Request) {
-	data := a.deps.HomeData(languageFromRequest(r))
-	form := a.deps.NewFormData(languageFromRequest(r))
-	form.CancelURL = withLang("/", languageFromRequest(r))
-	form.ReturnURL = withLang("/", languageFromRequest(r))
+	lang := resolvedLanguage(r)
+	persistLanguagePreference(w, lang)
+	data := a.deps.HomeData(lang)
+	data.CurrentURL = currentRequestURL(r, lang)
+	form := a.deps.NewFormData(lang)
+	form.CancelURL = withLang("/", lang)
+	form.ReturnURL = withLang("/", lang)
 	data.FormModal = &form
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := pages.Home(data).Render(r.Context(), w); err != nil {
@@ -75,8 +91,11 @@ func (a *App) handleNewProfile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handleImportProfile(w http.ResponseWriter, r *http.Request) {
-	data := a.deps.HomeData(languageFromRequest(r))
-	modal := a.deps.NewImportData(languageFromRequest(r))
+	lang := resolvedLanguage(r)
+	persistLanguagePreference(w, lang)
+	data := a.deps.HomeData(lang)
+	data.CurrentURL = currentRequestURL(r, lang)
+	modal := a.deps.NewImportData(lang)
 	data.ImportModal = &modal
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := pages.Home(data).Render(r.Context(), w); err != nil {
@@ -97,6 +116,7 @@ func (a *App) handleExportProfiles(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) handleImportPreview(w http.ResponseWriter, r *http.Request) {
 	lang := requestLang(r)
+	persistLanguagePreference(w, lang)
 	fileData, err := readUploadedImportFile(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -108,7 +128,11 @@ func (a *App) handleImportPreview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	modal.Lang = lang
+	if modal.OverwriteNotice == "" && modal.HasConflicts {
+		modal.OverwriteNotice = i18n.New(lang).T("import.overwrite_notice")
+	}
 	data := a.deps.HomeData(lang)
+	data.CurrentURL = currentRequestURL(r, lang)
 	data.ImportModal = &modal
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := pages.Home(data).Render(r.Context(), w); err != nil {
@@ -118,6 +142,7 @@ func (a *App) handleImportPreview(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) handleImportConfirm(w http.ResponseWriter, r *http.Request) {
 	lang := requestLang(r)
+	persistLanguagePreference(w, lang)
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -133,6 +158,7 @@ func (a *App) handleImportConfirm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data := a.deps.HomeData(lang)
+	data.CurrentURL = currentRequestURL(r, lang)
 	data.ImportResult = &result
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := pages.Home(data).Render(r.Context(), w); err != nil {
@@ -141,9 +167,10 @@ func (a *App) handleImportConfirm(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handleEditProfile(w http.ResponseWriter, r *http.Request) {
-	lang := languageFromRequest(r)
+	lang := resolvedLanguage(r)
+	persistLanguagePreference(w, lang)
 	profileID := chi.URLParam(r, "id")
-	formData, ok := a.deps.EditFormData(chi.URLParam(r, "id"), languageFromRequest(r))
+	formData, ok := a.deps.EditFormData(chi.URLParam(r, "id"), lang)
 	if !ok {
 		http.NotFound(w, r)
 		return
@@ -164,6 +191,7 @@ func (a *App) handleEditProfile(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if isHomeRedirect(returnURL) {
 		home := a.deps.HomeData(lang)
+		home.CurrentURL = currentRequestURL(r, lang)
 		selectedID := r.URL.Query().Get("selected")
 		if selectedID == "" {
 			selectedID = profileID
@@ -184,6 +212,7 @@ func (a *App) handleEditProfile(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	data.CurrentURL = currentRequestURL(r, lang)
 	data.EditURL = appendRedirect(data.EditURL, returnURL)
 	if err := pages.Detail(data).Render(r.Context(), w); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -191,17 +220,20 @@ func (a *App) handleEditProfile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handleSaveProfile(w http.ResponseWriter, r *http.Request) {
+	lang := requestLang(r)
+	persistLanguagePreference(w, lang)
 	id, err := a.deps.SaveProfile(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	http.Redirect(w, r, withLang(fallbackRedirect(r, "/profiles/"+id), requestLang(r)), http.StatusSeeOther)
+	http.Redirect(w, r, withLang(fallbackRedirect(r, "/profiles/"+id), lang), http.StatusSeeOther)
 }
 
 func (a *App) handleStartProfile(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	lang := requestLang(r)
+	persistLanguagePreference(w, lang)
 	if err := a.deps.StartProfile(id); err != nil {
 		http.Redirect(w, r, withError(fallbackRedirect(r, "/profiles/"+id), lang, err), http.StatusSeeOther)
 		return
@@ -212,6 +244,7 @@ func (a *App) handleStartProfile(w http.ResponseWriter, r *http.Request) {
 func (a *App) handleStopProfile(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	lang := requestLang(r)
+	persistLanguagePreference(w, lang)
 	if err := a.deps.StopProfile(id); err != nil {
 		http.Redirect(w, r, withError(fallbackRedirect(r, "/profiles/"+id), lang, err), http.StatusSeeOther)
 		return
@@ -222,6 +255,7 @@ func (a *App) handleStopProfile(w http.ResponseWriter, r *http.Request) {
 func (a *App) handleDeleteProfile(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	lang := requestLang(r)
+	persistLanguagePreference(w, lang)
 	if err := a.deps.DeleteProfile(id); err != nil {
 		http.Redirect(w, r, withError("/profiles/"+id, lang, err), http.StatusSeeOther)
 		return
@@ -233,39 +267,53 @@ func languageFromRequest(r *http.Request) string {
 	return r.URL.Query().Get("lang")
 }
 
-func requestLang(r *http.Request) string {
-	if lang := languageFromRequest(r); lang != "" {
-		return lang
-	}
-	if err := r.ParseForm(); err != nil {
+func localeFromCookie(r *http.Request) string {
+	cookie, err := r.Cookie(localeCookieName)
+	if err != nil {
 		return ""
 	}
-	return r.FormValue("lang")
+	return cookie.Value
+}
+
+func resolvedLanguage(r *http.Request) string {
+	if lang := languageFromRequest(r); lang != "" {
+		return i18n.Normalize(lang)
+	}
+	if lang := localeFromCookie(r); lang != "" {
+		return i18n.Normalize(lang)
+	}
+	return i18n.LangZH
+}
+
+func requestLang(r *http.Request) string {
+	if lang := languageFromRequest(r); lang != "" {
+		return i18n.Normalize(lang)
+	}
+	if err := r.ParseForm(); err != nil {
+		return resolvedLanguage(r)
+	}
+	if lang := r.FormValue("lang"); lang != "" {
+		return i18n.Normalize(lang)
+	}
+	return resolvedLanguage(r)
 }
 
 func withLang(path, lang string) string {
 	if lang == "" {
 		return path
 	}
-	if strings.Contains(path, "lang=") {
-		return path
-	}
-	return path + "?lang=" + lang
+	return withQueryValue(path, "lang", i18n.Normalize(lang))
 }
 
 func withError(path, lang string, err error) string {
-	values := url.Values{}
+	values := map[string]string{}
 	if lang != "" {
-		values.Set("lang", lang)
+		values["lang"] = i18n.Normalize(lang)
 	}
 	if err != nil {
-		values.Set("error", err.Error())
+		values["error"] = err.Error()
 	}
-	encoded := values.Encode()
-	if encoded == "" {
-		return path
-	}
-	return path + "?" + encoded
+	return withQueryValues(path, values)
 }
 
 func fallbackRedirect(r *http.Request, fallback string) string {
@@ -295,11 +343,7 @@ func appendRedirect(path, redirectTo string) string {
 	if redirectTo == "" {
 		return path
 	}
-	sep := "?"
-	if strings.Contains(path, "?") {
-		sep = "&"
-	}
-	return path + sep + "redirect_to=" + url.QueryEscape(redirectTo)
+	return withQueryValue(path, "redirect_to", redirectTo)
 }
 
 func isHomeRedirect(path string) bool {
@@ -307,11 +351,60 @@ func isHomeRedirect(path string) bool {
 }
 
 func selectedHomeURL(lang, profileID string) string {
-	path := "/?selected=" + profileID
-	if lang == "" {
-		return path
+	return withQueryValue(withLang("/", lang), "selected", profileID)
+}
+
+func currentRequestURL(r *http.Request, lang string) string {
+	if r.URL == nil {
+		return withLang("/", lang)
 	}
-	return "/?lang=" + lang + "&selected=" + profileID
+	current := r.URL.RequestURI()
+	if current == "" {
+		current = "/"
+	}
+	return withLang(current, lang)
+}
+
+func persistLanguagePreference(w http.ResponseWriter, lang string) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     localeCookieName,
+		Value:    i18n.Normalize(lang),
+		Path:     "/",
+		MaxAge:   int((365 * 24 * time.Hour) / time.Second),
+		HttpOnly: false,
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+func withQueryValue(rawPath, key, value string) string {
+	return withQueryValues(rawPath, map[string]string{key: value})
+}
+
+func withQueryValues(rawPath string, updates map[string]string) string {
+	if rawPath == "" {
+		rawPath = "/"
+	}
+	parsed, err := url.Parse(rawPath)
+	if err != nil {
+		return rawPath
+	}
+	values := parsed.Query()
+	for key, value := range updates {
+		if strings.TrimSpace(value) == "" {
+			values.Del(key)
+			continue
+		}
+		values.Set(key, value)
+	}
+	parsed.RawQuery = values.Encode()
+	pathValue := parsed.Path
+	if pathValue == "" {
+		pathValue = "/"
+	}
+	if parsed.RawQuery == "" {
+		return pathValue
+	}
+	return pathValue + "?" + parsed.RawQuery
 }
 
 func readUploadedImportFile(r *http.Request) ([]byte, error) {

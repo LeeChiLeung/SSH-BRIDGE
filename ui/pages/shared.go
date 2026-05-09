@@ -3,6 +3,8 @@ package pages
 import (
 	"fmt"
 	"html/template"
+	"net/url"
+	"strings"
 
 	"timber-ssh-go/ui/i18n"
 )
@@ -100,26 +102,47 @@ func baseStyles() string {
 }
 
 func languageSwitcher(basePath string, current string, t i18n.Translator) string {
-	zhClass := "link"
-	enClass := "link"
-	if i18n.Normalize(current) == i18n.LangZH {
-		zhClass = "link primary"
-	} else {
-		enClass = "link primary"
+	current = i18n.Normalize(current)
+	buttons := []struct {
+		lang  string
+		label string
+	}{
+		{lang: i18n.LangZH, label: "ZH"},
+		{lang: i18n.LangEN, label: "EN"},
+		{lang: i18n.LangJA, label: "JP"},
 	}
-	return fmt.Sprintf(
-		`<span class="lang-switch">%s</span><a class="%s" href="%s">中文</a><a class="%s" href="%s">EN</a>`,
-		template.HTMLEscapeString(t.T("lang.switch")),
-		zhClass,
-		template.HTMLEscapeString(withLangPage(basePath, i18n.LangZH)),
-		enClass,
-		template.HTMLEscapeString(withLangPage(basePath, i18n.LangEN)),
-	)
+	var links strings.Builder
+	for _, button := range buttons {
+		className := "link"
+		if current == button.lang {
+			className = "link primary"
+		}
+		links.WriteString(fmt.Sprintf(
+			`<a class="%s" href="%s">%s</a>`,
+			className,
+			template.HTMLEscapeString(withLangPage(basePath, button.lang)),
+			template.HTMLEscapeString(button.label),
+		))
+	}
+	return links.String()
 }
 
 func withLangPage(path, lang string) string {
 	if path == "" {
 		path = "/"
 	}
-	return fmt.Sprintf("%s?lang=%s", path, lang)
+	parsed, err := url.Parse(path)
+	if err != nil {
+		return path
+	}
+	values := parsed.Query()
+	values.Set("lang", i18n.Normalize(lang))
+	parsed.RawQuery = values.Encode()
+	if parsed.Path == "" {
+		parsed.Path = "/"
+	}
+	if parsed.RawQuery == "" {
+		return parsed.Path
+	}
+	return parsed.Path + "?" + parsed.RawQuery
 }
