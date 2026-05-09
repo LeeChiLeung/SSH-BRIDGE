@@ -44,7 +44,33 @@ func TestBuildUIProfileCardsUsesSharedSnapshotData(t *testing.T) {
 	if cards[0].StateLabel != "已连接" {
 		t.Fatalf("StateLabel = %q", cards[0].StateLabel)
 	}
+	if cards[0].StateTone != "green" {
+		t.Fatalf("StateTone = %q", cards[0].StateTone)
+	}
 	if !cards[0].CanStop || cards[0].CanStart {
 		t.Fatalf("card start/stop flags = start:%v stop:%v", cards[0].CanStart, cards[0].CanStop)
+	}
+}
+
+func TestStateToneText(t *testing.T) {
+	cases := []struct {
+		name      string
+		state     TunnelState
+		lastError string
+		want      string
+	}{
+		{name: "disconnected", state: TunnelStateDisconnected, want: "gray"},
+		{name: "connecting", state: TunnelStateConnecting, want: "blue"},
+		{name: "retrying", state: TunnelStateRetrying, want: "blue"},
+		{name: "connected", state: TunnelStateConnected, want: "green"},
+		{name: "failed", state: TunnelStateDisconnected, lastError: "auth failed", want: "red"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := stateToneText(tc.state, tc.lastError); got != tc.want {
+				t.Fatalf("stateToneText(%q, %q) = %q, want %q", tc.state, tc.lastError, got, tc.want)
+			}
+		})
 	}
 }

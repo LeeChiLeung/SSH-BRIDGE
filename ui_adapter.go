@@ -135,6 +135,7 @@ func buildProfileCard(profile Profile, snapshot TunnelSnapshot, lang string) vie
 		RemoteTarget:    cfg.RemoteAddr(),
 		LastEnabledText: formatTime(profile.LastEnabledAt),
 		StateLabel:      statusLabelText(lang, TunnelStateDisconnected),
+		StateTone:       stateToneText(TunnelStateDisconnected, ""),
 		DetailURL:       homeSelectedURL(lang, profile.ID),
 		StartURL:        withLangUI("/profiles/"+profile.ID+"/start", lang),
 		StopURL:         withLangUI("/profiles/"+profile.ID+"/stop", lang),
@@ -147,6 +148,7 @@ func buildProfileCard(profile Profile, snapshot TunnelSnapshot, lang string) vie
 	}
 	if snapshot.State != "" {
 		card.StateLabel = statusLabelText(lang, snapshot.State)
+		card.StateTone = stateToneText(snapshot.State, snapshot.LastError)
 		card.CanStart = snapshot.State == TunnelStateDisconnected
 		card.CanStop = snapshot.State != TunnelStateDisconnected
 	}
@@ -263,5 +265,24 @@ func statusLabelText(lang string, state TunnelState) string {
 		return t.T("state.retrying")
 	default:
 		return t.T("state.disconnected")
+	}
+}
+
+func stateToneText(state TunnelState, lastError string) string {
+	switch state {
+	case TunnelStateConnected:
+		return "green"
+	case TunnelStateConnecting, TunnelStateRetrying:
+		return "blue"
+	case TunnelStateDisconnected:
+		if lastError != "" {
+			return "red"
+		}
+		return "gray"
+	default:
+		if lastError != "" {
+			return "red"
+		}
+		return "gray"
 	}
 }

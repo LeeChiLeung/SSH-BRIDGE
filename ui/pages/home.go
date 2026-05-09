@@ -134,9 +134,9 @@ func renderListRow(row viewmodel.ProfileCard, t i18n.Translator) string {
 	if row.Selected {
 		rowClass += " selected"
 	}
-	return fmt.Sprintf(`<article class="%s">
+return fmt.Sprintf(`<article class="%s">
 <a class="row-main" href="%s">
-  <span><span class="state">%s</span></span>
+  <span><span class="state state-%s">%s</span></span>
   <span class="row-title">%s</span>
   <span>%s</span>
   <span>%s</span>
@@ -148,9 +148,10 @@ func renderListRow(row viewmodel.ProfileCard, t i18n.Translator) string {
   %s
   %s
 </div>
-</article>`,
+	</article>`,
 		rowClass,
 		template.HTMLEscapeString(row.DetailURL),
+		template.HTMLEscapeString(row.StateTone),
 		template.HTMLEscapeString(row.StateLabel),
 		template.HTMLEscapeString(row.Title),
 		template.HTMLEscapeString(row.SSHAddress),

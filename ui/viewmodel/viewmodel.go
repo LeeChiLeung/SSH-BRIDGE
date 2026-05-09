@@ -24,6 +24,7 @@ type ProfileCard struct {
 	RemoteTarget    string
 	LastEnabledText string
 	StateLabel      string
+	StateTone       string
 	DetailURL       string
 	StartURL        string
 	StopURL         string

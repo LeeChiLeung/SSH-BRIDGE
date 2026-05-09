@@ -26,7 +26,11 @@ func baseStyles() string {
     .detail-card { margin-top:22px; }
     .meta { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; }
     .meta h3 { margin:0; font-size:20px; }
-    .state { display:inline-flex; padding:6px 10px; border-radius:999px; background:#dbeafe; color:#1d4ed8; font-size:12px; font-weight:700; }
+    .state { display:inline-flex; padding:6px 10px; border-radius:999px; font-size:12px; font-weight:700; }
+    .state-gray { background:#e5e7eb; color:#4b5563; }
+    .state-blue { background:#dbeafe; color:#1d4ed8; }
+    .state-green { background:#dcfce7; color:#15803d; }
+    .state-red { background:#fee2e2; color:#b91c1c; }
     dl { margin:0; display:grid; gap:12px; }
     dt { font-size:12px; color:var(--muted); margin-bottom:4px; }
     dd { margin:0; font-size:15px; word-break:break-all; }
