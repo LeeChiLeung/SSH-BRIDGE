@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"runtime"
 	"strconv"
 	"syscall"
 )
@@ -41,6 +42,19 @@ func main() {
 		return
 	}
 
+	if shouldDefaultToTray(opts) {
+		opts.TrayMode = true
+		opts.WebMode = false
+		opts.WebNewMode = false
+	}
+
+	if opts.TrayMode {
+		if err := runTrayMode(opts, logger); err != nil {
+			logger.Printf("tray mode exited with error: %v", err)
+			os.Exit(1)
+		}
+		return
+	}
 	if opts.WebMode {
 		if err := runWebMode(opts, logger); err != nil {
 			logger.Printf("web console exited with error: %v", err)
@@ -51,13 +65,6 @@ func main() {
 	if opts.WebNewMode {
 		if err := runNewWebMode(opts, logger); err != nil {
 			logger.Printf("new web console exited with error: %v", err)
-			os.Exit(1)
-		}
-		return
-	}
-	if opts.TrayMode {
-		if err := runTrayMode(opts, logger); err != nil {
-			logger.Printf("tray mode exited with error: %v", err)
 			os.Exit(1)
 		}
 		return
@@ -121,6 +128,10 @@ func parseCLI() (cliOptions, error) {
 	if opts.VersionMode {
 		return opts, nil
 	}
+	if shouldDefaultToTrayForOS(runtime.GOOS, opts) {
+		opts.TrayMode = true
+		return opts, nil
+	}
 	if opts.WebMode || opts.WebNewMode || opts.TrayMode {
 		if opts.WebAddr == "" {
 			return opts, fmt.Errorf("web listen address is required")
@@ -134,6 +145,26 @@ func parseCLI() (cliOptions, error) {
 		return opts, err
 	}
 	return opts, nil
+}
+
+func shouldDefaultToTray(opts cliOptions) bool {
+	return shouldDefaultToTrayForOS(runtime.GOOS, opts)
+}
+
+func shouldDefaultToTrayForOS(goos string, opts cliOptions) bool {
+	if goos != "windows" {
+		return false
+	}
+	if opts.EnvMode || opts.ChildMode || opts.VersionMode {
+		return false
+	}
+	if opts.WebMode || opts.WebNewMode || opts.TrayMode {
+		return false
+	}
+	if flag.NArg() > 0 {
+		return false
+	}
+	return true
 }
 
 func runTunnelMode(opts cliOptions, logger *log.Logger) error {
