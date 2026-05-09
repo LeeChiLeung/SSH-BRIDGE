@@ -16,10 +16,10 @@ func TestTrayAppMenuAndOpenAction(t *testing.T) {
 	manager := newFakeTrayManager()
 	opener := &fakeBrowserOpener{}
 	app := &trayApp{
-		manager: manager,
-		opener:  opener,
-		logger:  log.New(io.Discard, "", 0),
-		webURL:  "http://127.0.0.1:8848",
+		manager:   manager,
+		opener:    opener,
+		logger:    log.New(io.Discard, "", 0),
+		newWebURL: "http://127.0.0.1:8849",
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -31,13 +31,40 @@ func TestTrayAppMenuAndOpenAction(t *testing.T) {
 	}()
 
 	manager.waitReady(t)
-	if got := manager.menuLabels(); len(got) != 2 || got[0] != trayOpenConsoleLabel || got[1] != trayQuitLabel {
+	if got := manager.menuLabels(); len(got) != 2 || got[0] != trayOpenNewConsole || got[1] != trayQuitLabel {
 		t.Fatalf("unexpected tray menu labels: %v", got)
 	}
 
-	manager.click(trayOpenConsoleLabel)
+	cancel()
+	if err := <-done; err != nil {
+		t.Fatalf("tray app returned error: %v", err)
+	}
+}
+
+func TestTrayAppNewConsoleAction(t *testing.T) {
+	t.Parallel()
+
+	manager := newFakeTrayManager()
+	opener := &fakeBrowserOpener{}
+	app := &trayApp{
+		manager:   manager,
+		opener:    opener,
+		logger:    log.New(io.Discard, "", 0),
+		newWebURL: "http://127.0.0.1:8849",
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	done := make(chan error, 1)
+	go func() {
+		done <- app.Run(ctx)
+	}()
+
+	manager.waitReady(t)
+	manager.click(trayOpenNewConsole)
 	waitForCondition(t, func() bool {
-		return opener.lastURL() == "http://127.0.0.1:8848"
+		return opener.lastURL() == "http://127.0.0.1:8849"
 	})
 
 	cancel()
@@ -52,10 +79,10 @@ func TestTrayAppQuitActionTriggersShutdown(t *testing.T) {
 	manager := newFakeTrayManager()
 	quitCalled := make(chan struct{}, 1)
 	app := &trayApp{
-		manager: manager,
-		opener:  &fakeBrowserOpener{},
-		logger:  log.New(io.Discard, "", 0),
-		webURL:  "http://127.0.0.1:8848",
+		manager:   manager,
+		opener:    &fakeBrowserOpener{},
+		logger:    log.New(io.Discard, "", 0),
+		newWebURL: "http://127.0.0.1:8849",
 		onQuit: func() {
 			quitCalled <- struct{}{}
 		},
@@ -90,10 +117,10 @@ func TestTrayAppOpenFailureKeepsTrayAlive(t *testing.T) {
 
 	manager := newFakeTrayManager()
 	app := &trayApp{
-		manager: manager,
-		opener:  failingBrowserOpener{},
-		logger:  log.New(io.Discard, "", 0),
-		webURL:  "http://127.0.0.1:8848",
+		manager:   manager,
+		opener:    failingBrowserOpener{},
+		logger:    log.New(io.Discard, "", 0),
+		newWebURL: "http://127.0.0.1:8849",
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -105,7 +132,7 @@ func TestTrayAppOpenFailureKeepsTrayAlive(t *testing.T) {
 	}()
 
 	manager.waitReady(t)
-	manager.click(trayOpenConsoleLabel)
+	manager.click(trayOpenNewConsole)
 
 	select {
 	case err := <-done:

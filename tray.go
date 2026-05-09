@@ -19,7 +19,7 @@ import (
 var embeddedCustomTrayIcon []byte
 
 const (
-	trayOpenConsoleLabel = "打开控制台"
+	trayOpenNewConsole   = "打开控制台"
 	trayQuitLabel        = "退出"
 )
 
@@ -41,24 +41,24 @@ type browserOpener interface {
 }
 
 type trayApp struct {
-	manager trayManager
-	opener  browserOpener
-	logger  *log.Logger
-	webURL  string
-	onQuit  func()
+	manager   trayManager
+	opener    browserOpener
+	logger    *log.Logger
+	newWebURL string
+	onQuit    func()
 }
 
-func newDefaultTrayApp(logger *log.Logger, onOpenURL string, onQuit func()) (*trayApp, error) {
+func newDefaultTrayApp(logger *log.Logger, onOpenNewURL string, onQuit func()) (*trayApp, error) {
 	manager, err := newDefaultTrayManager()
 	if err != nil {
 		return nil, err
 	}
 	return &trayApp{
-		manager: manager,
-		opener:  commandBrowserOpener{},
-		logger:  logger,
-		webURL:  onOpenURL,
-		onQuit:  onQuit,
+		manager:   manager,
+		opener:    commandBrowserOpener{},
+		logger:    logger,
+		newWebURL: onOpenNewURL,
+		onQuit:    onQuit,
 	}, nil
 }
 
@@ -75,13 +75,11 @@ func (a *trayApp) Run(ctx context.Context) error {
 		a.manager.SetTooltip("Timber SSH Go")
 		a.manager.SetIcon(resolveTrayIcon())
 
-		openItem := a.manager.AddMenuItem(trayOpenConsoleLabel, "打开本地 Web 控制台")
+		newOpenItem := a.manager.AddMenuItem(trayOpenNewConsole, "打开新的本地 Web 控制台")
 		quitItem := a.manager.AddMenuItem(trayQuitLabel, "退出程序")
 
-		openItem.OnClick(func() {
-			if err := a.opener.Open(a.webURL); err != nil && a.logger != nil {
-				a.logger.Printf("open browser failed: %v", err)
-			}
+		newOpenItem.OnClick(func() {
+			a.openURL(a.newWebURL)
 		})
 		quitItem.OnClick(func() {
 			if a.onQuit != nil {
@@ -95,6 +93,15 @@ func (a *trayApp) Run(ctx context.Context) error {
 
 	<-done
 	return nil
+}
+
+func (a *trayApp) openURL(url string) {
+	if url == "" {
+		return
+	}
+	if err := a.opener.Open(url); err != nil && a.logger != nil {
+		a.logger.Printf("open browser failed: %v", err)
+	}
 }
 
 func resolveTrayIcon() []byte {

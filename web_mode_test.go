@@ -31,3 +31,13 @@ func TestManagedWebModesSelectDifferentImplementations(t *testing.T) {
 		t.Fatalf("new server type = %T, want *TemplWebServer", modern.server)
 	}
 }
+
+func TestNextWebAddrUsesAdjacentPort(t *testing.T) {
+	got, err := nextWebAddr("127.0.0.1:8848")
+	if err != nil {
+		t.Fatalf("nextWebAddr: %v", err)
+	}
+	if got != "127.0.0.1:8849" {
+		t.Fatalf("nextWebAddr = %q, want %q", got, "127.0.0.1:8849")
+	}
+}

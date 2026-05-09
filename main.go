@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/netip"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -171,7 +172,17 @@ func runNewWebMode(opts cliOptions, logger *log.Logger) error {
 }
 
 func runTrayMode(opts cliOptions, logger *log.Logger) error {
-	managed, err := newManagedWebMode(opts, logger)
+	legacy, err := newManagedWebMode(opts, logger)
+	if err != nil {
+		return err
+	}
+	newAddr, err := nextWebAddr(opts.WebAddr)
+	if err != nil {
+		return err
+	}
+	newOpts := opts
+	newOpts.WebAddr = newAddr
+	modern, err := newManagedNewWebMode(newOpts, logger)
 	if err != nil {
 		return err
 	}
@@ -179,12 +190,15 @@ func runTrayMode(opts cliOptions, logger *log.Logger) error {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	serverErrCh := make(chan error, 1)
+	serverErrCh := make(chan error, 2)
 	go func() {
-		serverErrCh <- managed.server.Run(ctx)
+		serverErrCh <- legacy.server.Run(ctx)
+	}()
+	go func() {
+		serverErrCh <- modern.server.Run(ctx)
 	}()
 
-	tray, err := newDefaultTrayApp(logger, managed.webURL(), cancel)
+	tray, err := newDefaultTrayApp(logger, modern.webURL(), cancel)
 	if err != nil {
 		cancel()
 		return err
@@ -198,13 +212,13 @@ func runTrayMode(opts cliOptions, logger *log.Logger) error {
 	var firstErr error
 	var serverErr error
 	var trayErr error
-	serverDone := false
+	serverDone := 0
 	trayDone := false
 	select {
 	case err := <-serverErrCh:
 		firstErr = err
 		serverErr = err
-		serverDone = true
+		serverDone = 1
 		cancel()
 	case err := <-trayErrCh:
 		firstErr = err
@@ -213,8 +227,12 @@ func runTrayMode(opts cliOptions, logger *log.Logger) error {
 		cancel()
 	}
 
-	if !serverDone {
-		serverErr = <-serverErrCh
+	for serverDone < 2 {
+		err := <-serverErrCh
+		serverDone++
+		if serverErr == nil {
+			serverErr = err
+		}
 	}
 	if !trayDone {
 		trayErr = <-trayErrCh
@@ -270,6 +288,27 @@ func newManagedNewWebMode(opts cliOptions, logger *log.Logger) (*managedWebMode,
 	controller := NewTunnelController(logger, store)
 	server := NewTemplWebServer(opts.WebAddr, newUIRouter(controller, store, ""))
 	return &managedWebMode{server: server, webAddr: opts.WebAddr}, nil
+}
+
+func nextWebAddr(addr string) (string, error) {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return "", fmt.Errorf("parse web listen address: %w", err)
+	}
+	portNum, err := strconv.Atoi(port)
+	if err != nil {
+		return "", fmt.Errorf("parse web listen port: %w", err)
+	}
+	if portNum <= 0 || portNum >= 65535 {
+		return "", fmt.Errorf("web listen port out of range: %d", portNum)
+	}
+	if host == "" {
+		host = "127.0.0.1"
+	}
+	if ip, err := netip.ParseAddr(host); err == nil && ip.Is6() {
+		return net.JoinHostPort(host, strconv.Itoa(portNum+1)), nil
+	}
+	return net.JoinHostPort(host, strconv.Itoa(portNum+1)), nil
 }
 
 func runManagedWebMode(opts cliOptions, logger *log.Logger, ctx context.Context) error {
