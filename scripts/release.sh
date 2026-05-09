@@ -9,7 +9,7 @@ DEFAULT_TARGETS="linux/amd64 linux/arm64 windows/amd64"
 TARGETS="${TARGETS:-$DEFAULT_TARGETS}"
 GOFLAGS_RELEASE="${GOFLAGS_RELEASE:--trimpath -buildvcs=false}"
 APPIMAGETOOL_BIN="${APPIMAGETOOL_BIN:-appimagetool}"
-APPIMAGE_RUNTIME_FILE="${APPIMAGE_RUNTIME_FILE:-}"
+APPIMAGE_RUNTIME_FILE="${APPIMAGE_RUNTIME_FILE:-$ROOT_DIR/public/obsolete-runtime-x86_64}"
 APPIMAGE_COMP="${APPIMAGE_COMP:-xz}"
 
 usage() {
@@ -27,7 +27,8 @@ Environment:
                      linux/amd64 linux/arm64 windows/amd64
   APPIMAGETOOL_BIN   AppImage tool path override. Default: appimagetool
   APPIMAGE_RUNTIME_FILE
-                     Optional local AppImage runtime file passed to appimagetool
+                     Local AppImage runtime file passed to appimagetool.
+                     Default: ./public/obsolete-runtime-x86_64
   APPIMAGE_COMP      Squashfs compression for AppImage. Default: xz
   KEEP_WORK          Preserve intermediate packaging work directories when set to 1
 EOF

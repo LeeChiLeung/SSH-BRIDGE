@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"timber-ssh-go/ui"
 	"timber-ssh-go/ui/i18n"
@@ -18,6 +19,8 @@ func newUIRouter(controller *TunnelController, store *ProfileStore, legacyURL st
 				Version:   currentBuildInfo().Version,
 				HomeURL:   "/",
 				NewURL:    withLangUI("/profiles/new", lang),
+				ExportURL: withLangUI("/profiles/export", lang),
+				ImportURL: withLangUI("/profiles/import", lang),
 				LegacyURL: legacyURL,
 				Cards:     buildUIProfileCards(controller, store, lang),
 			}
@@ -48,6 +51,9 @@ func newUIRouter(controller *TunnelController, store *ProfileStore, legacyURL st
 		},
 		NewFormData: func(lang string) viewmodel.FormPageData {
 			return buildFormData(profileFromConfig("", defaultTunnelConfig()), false, lang)
+		},
+		NewImportData: func(lang string) viewmodel.ImportModalData {
+			return buildImportModalData(lang)
 		},
 		EditFormData: func(id string, lang string) (viewmodel.FormPageData, bool) {
 			profile, ok := store.Get(id)
@@ -84,6 +90,27 @@ func newUIRouter(controller *TunnelController, store *ProfileStore, legacyURL st
 				return fmt.Errorf("cannot delete a running profile")
 			}
 			return store.Delete(id)
+		},
+		ExportProfiles: func() (string, []byte, error) {
+			data, err := store.ExportTransferJSON(time.Now())
+			if err != nil {
+				return "", nil, err
+			}
+			return "timber-ssh-go-profiles.json", data, nil
+		},
+		PreviewImport: func(data []byte) (viewmodel.ImportModalData, error) {
+			preview, err := store.PreviewImport(data)
+			if err != nil {
+				return viewmodel.ImportModalData{}, err
+			}
+			return buildImportPreviewModalData(preview, data, ""), nil
+		},
+		ApplyImport: func(data []byte, policy string) (viewmodel.ImportResultData, error) {
+			result, err := store.ApplyImport(data, policy)
+			if err != nil {
+				return viewmodel.ImportResultData{}, err
+			}
+			return viewmodel.ImportResultData(result), nil
 		},
 	})
 }
@@ -177,6 +204,38 @@ func buildFormData(profile Profile, isEdit bool, lang string) viewmodel.FormPage
 		KnownHostsPath:     profile.KnownHostsPath,
 		InsecureIgnoreHost: profile.InsecureIgnoreHost,
 	}
+}
+
+func buildImportModalData(lang string) viewmodel.ImportModalData {
+	return viewmodel.ImportModalData{
+		Lang:      lang,
+		Title:     "Timber SSH Go",
+		Version:   currentBuildInfo().Version,
+		CancelURL: withLangUI("/", lang),
+		PreviewURL: withLangUI("/profiles/import/preview", lang),
+		ConfirmURL: withLangUI("/profiles/import/confirm", lang),
+	}
+}
+
+func buildImportPreviewModalData(preview ProfileImportPreview, raw []byte, lang string) viewmodel.ImportModalData {
+	modal := buildImportModalData(lang)
+	modal.HasPreview = true
+	modal.HasConflicts = len(preview.Conflicts) > 0
+	modal.PayloadBase64 = encodeImportPayload(raw)
+	modal.OverwriteNotice = "合并会使用导入文件覆盖现有配置字段，跳过会保留本地同名配置。"
+	for _, item := range preview.Added {
+		modal.AddedTitles = append(modal.AddedTitles, item.Title)
+	}
+	for _, item := range preview.Conflicts {
+		modal.ConflictTitles = append(modal.ConflictTitles, item.Title)
+	}
+	for _, item := range preview.Invalid {
+		modal.InvalidItems = append(modal.InvalidItems, viewmodel.ImportInvalidItem{
+			Title:  item.Title,
+			Reason: item.Reason,
+		})
+	}
+	return modal
 }
 
 func withLangUI(path, lang string) string {

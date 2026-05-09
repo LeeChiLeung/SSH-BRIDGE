@@ -1,6 +1,9 @@
 package ui
 
 import (
+	"encoding/base64"
+	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -65,6 +68,72 @@ func (a *App) handleNewProfile(w http.ResponseWriter, r *http.Request) {
 	form.CancelURL = withLang("/", languageFromRequest(r))
 	form.ReturnURL = withLang("/", languageFromRequest(r))
 	data.FormModal = &form
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := pages.Home(data).Render(r.Context(), w); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (a *App) handleImportProfile(w http.ResponseWriter, r *http.Request) {
+	data := a.deps.HomeData(languageFromRequest(r))
+	modal := a.deps.NewImportData(languageFromRequest(r))
+	data.ImportModal = &modal
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := pages.Home(data).Render(r.Context(), w); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (a *App) handleExportProfiles(w http.ResponseWriter, r *http.Request) {
+	filename, data, err := a.deps.ExportProfiles()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
+	_, _ = w.Write(data)
+}
+
+func (a *App) handleImportPreview(w http.ResponseWriter, r *http.Request) {
+	lang := requestLang(r)
+	fileData, err := readUploadedImportFile(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	modal, err := a.deps.PreviewImport(fileData)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	modal.Lang = lang
+	data := a.deps.HomeData(lang)
+	data.ImportModal = &modal
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := pages.Home(data).Render(r.Context(), w); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (a *App) handleImportConfirm(w http.ResponseWriter, r *http.Request) {
+	lang := requestLang(r)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	payload, err := decodeImportPayload(r.FormValue("payload"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	result, err := a.deps.ApplyImport(payload, r.FormValue("policy"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	data := a.deps.HomeData(lang)
+	data.ImportResult = &result
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := pages.Home(data).Render(r.Context(), w); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -243,4 +312,28 @@ func selectedHomeURL(lang, profileID string) string {
 		return path
 	}
 	return "/?lang=" + lang + "&selected=" + profileID
+}
+
+func readUploadedImportFile(r *http.Request) ([]byte, error) {
+	if err := r.ParseMultipartForm(8 << 20); err != nil {
+		return nil, fmt.Errorf("parse upload: %w", err)
+	}
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		return nil, fmt.Errorf("read uploaded file: %w", err)
+	}
+	defer file.Close()
+	data, err := io.ReadAll(io.LimitReader(file, 8<<20))
+	if err != nil {
+		return nil, fmt.Errorf("read uploaded file data: %w", err)
+	}
+	return data, nil
+}
+
+func decodeImportPayload(encoded string) ([]byte, error) {
+	data, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		return nil, fmt.Errorf("decode import payload: %w", err)
+	}
+	return data, nil
 }

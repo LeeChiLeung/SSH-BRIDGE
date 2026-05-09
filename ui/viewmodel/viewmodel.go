@@ -6,9 +6,13 @@ type HomePageData struct {
 	Lang           string
 	HomeURL        string
 	NewURL         string
+	ExportURL      string
+	ImportURL      string
 	LegacyURL      string
 	Cards          []ProfileCard
 	FormModal      *FormPageData
+	ImportModal    *ImportModalData
+	ImportResult   *ImportResultData
 	SelectedDetail *DetailPageData
 }
 

@@ -31,6 +31,8 @@ func Home(data viewmodel.HomePageData) templ.Component {
       <div class="actions">
         %s
         <a class="link" href="%s">%s</a>
+        <a class="link" href="%s">%s</a>
+        <a class="link" href="%s">%s</a>
         <a class="link primary" href="%s">%s</a>
       </div>
     </section>`,
@@ -39,6 +41,10 @@ func Home(data viewmodel.HomePageData) templ.Component {
 			baseStyles(),
 			template.HTMLEscapeString(data.Title),
 			languageSwitcher(data.HomeURL, data.Lang, t),
+			template.HTMLEscapeString(data.ExportURL),
+			template.HTMLEscapeString(t.T("home.export")),
+			template.HTMLEscapeString(data.ImportURL),
+			template.HTMLEscapeString(t.T("home.import")),
 			template.HTMLEscapeString(data.NewURL),
 			template.HTMLEscapeString(t.T("home.new")),
 			withLangPage(data.HomeURL, data.Lang),
@@ -46,6 +52,12 @@ func Home(data viewmodel.HomePageData) templ.Component {
 		)
 		if err != nil {
 			return err
+		}
+
+		if data.ImportResult != nil {
+			if _, err = io.WriteString(w, renderImportResult(*data.ImportResult, t)); err != nil {
+				return err
+			}
 		}
 
 		if len(data.Cards) == 0 {
@@ -72,10 +84,29 @@ func Home(data viewmodel.HomePageData) templ.Component {
 				return err
 			}
 		}
+		if data.ImportModal != nil {
+			if _, err = io.WriteString(w, renderImportModal(*data.ImportModal)); err != nil {
+				return err
+			}
+		}
 
 		_, err = fmt.Fprintf(w, `<footer class="footer">Version %s</footer></main></body></html>`, template.HTMLEscapeString(data.Version))
 		return err
 	})
+}
+
+func renderImportResult(data viewmodel.ImportResultData, t i18n.Translator) string {
+	return fmt.Sprintf(`<section class="import-result"><strong>%s</strong> %s %d，%s %d，%s %d，%s %d。</section>`,
+		template.HTMLEscapeString(t.T("import.result_title")),
+		template.HTMLEscapeString(t.T("import.added")),
+		data.Added,
+		template.HTMLEscapeString(t.T("import.merged")),
+		data.Merged,
+		template.HTMLEscapeString(t.T("import.skipped")),
+		data.Skipped,
+		template.HTMLEscapeString(t.T("import.invalid")),
+		data.Invalid,
+	)
 }
 
 func renderListSection(data viewmodel.HomePageData, t i18n.Translator) string {

@@ -206,8 +206,10 @@ WebUI 使用 profile 持久化保存常用隧道配置。
 构建 AppImage：
 
 ```bash
-APPIMAGE_RUNTIME_FILE=/path/to/runtime-x86_64 ./scripts/release.sh appimage amd64
+./scripts/release.sh appimage amd64
 ```
+
+默认会使用仓库内的 `public/obsolete-runtime-x86_64` 作为 AppImage runtime；如果需要覆盖，仍可显式传入 `APPIMAGE_RUNTIME_FILE=/path/to/runtime-x86_64`。
 
 默认产物输出到：
 
