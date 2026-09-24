@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -437,6 +438,23 @@ func profileFromRequest(r *http.Request) (Profile, error) {
 		AutoStart:          r.FormValue("auto_start") == "on",
 	}
 
+	if r.MultipartForm != nil {
+		if file, header, err := r.FormFile("ssh_key_file"); err == nil && header != nil {
+			defer file.Close()
+			if header.Size > 0 && strings.TrimSpace(header.Filename) != "" {
+				data, err := io.ReadAll(io.LimitReader(file, 1<<20))
+				if err != nil {
+					return Profile{}, fmt.Errorf("read uploaded SSH key: %w", err)
+				}
+				savedPath, err := saveUploadedPrivateKey(header.Filename, data)
+				if err != nil {
+					return Profile{}, err
+				}
+				profile.SSHKeyPath = savedPath
+			}
+		}
+	}
+
 	var err error
 	if profile.SSHPort, err = strconv.Atoi(r.FormValue("ssh_port")); err != nil {
 		return Profile{}, fmt.Errorf("invalid SSH port")
@@ -790,7 +808,7 @@ const webTemplates = `
         <div class="detail-sub">密码优先于私钥认证。当前 profile 会把密码和私钥路径一起保存到本地配置文件。</div>
       </div>
     </div>
-    <form action="{{.FormAction}}" method="post" data-async-form="true" data-target="#detail-panel">
+    <form action="{{.FormAction}}" method="post" enctype="multipart/form-data" data-async-form="true" data-target="#detail-panel">
       <input type="hidden" name="id" value="{{.Profile.ID}}">
       <div class="form-grid">
         <div class="form-field"><label>标题</label><input name="title" value="{{.Profile.Title}}"></div>
@@ -798,6 +816,7 @@ const webTemplates = `
         <div class="form-field"><label>SSH 地址</label><input name="ssh_host" value="{{.Profile.SSHHost}}"></div>
         <div class="form-field"><label>SSH 端口</label><input name="ssh_port" value="{{.Profile.SSHPort}}"></div>
         <div class="form-field"><label>SSH 密码</label><input type="password" name="ssh_password" value="{{.Profile.SSHPassword}}"></div>
+        <div class="form-field"><label>上传私钥 (.pem)</label><input type="file" name="ssh_key_file" accept=".pem,.key,id_rsa,id_ed25519"></div>
         <div class="form-field"><label>私钥路径</label><input name="ssh_key_path" value="{{.Profile.SSHKeyPath}}" placeholder="密码为空时才会使用私钥"></div>
         <div class="form-field"><label>本地地址</label><input name="local_addr" value="{{.Profile.LocalAddr}}"></div>
         <div class="form-field"><label>本地端口</label><input name="local_port" value="{{.Profile.LocalPort}}"></div>

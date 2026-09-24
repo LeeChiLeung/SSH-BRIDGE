@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/crypto/ssh"
 )
 
 type Profile struct {
@@ -238,3 +240,32 @@ func expandPath(path string) (string, error) {
 	}
 	return path, nil
 }
+
+func defaultKeysDir() string {
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		return filepath.Join(".", "keys")
+	}
+	return filepath.Join(configDir, "timber-ssh-go", "keys")
+}
+
+func saveUploadedPrivateKey(filename string, data []byte) (string, error) {
+	if _, err := ssh.ParsePrivateKey(data); err != nil {
+		return "", fmt.Errorf("invalid SSH private key: %w", err)
+	}
+	keysDir := defaultKeysDir()
+	if err := os.MkdirAll(keysDir, 0o700); err != nil {
+		return "", fmt.Errorf("create keys directory: %w", err)
+	}
+	cleanName := filepath.Base(filename)
+	if cleanName == "." || cleanName == "/" || cleanName == "" {
+		cleanName = "id_rsa.pem"
+	}
+	targetName := fmt.Sprintf("%d_%s", time.Now().UnixNano(), cleanName)
+	targetPath := filepath.Join(keysDir, targetName)
+	if err := os.WriteFile(targetPath, data, 0o600); err != nil {
+		return "", fmt.Errorf("save private key: %w", err)
+	}
+	return targetPath, nil
+}
+

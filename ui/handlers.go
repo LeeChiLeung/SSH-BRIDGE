@@ -285,13 +285,20 @@ func resolvedLanguage(r *http.Request) string {
 	return i18n.LangZH
 }
 
+func parseRequestForm(r *http.Request) {
+	contentType := r.Header.Get("Content-Type")
+	if strings.Contains(contentType, "multipart/form-data") {
+		_ = r.ParseMultipartForm(8 << 20)
+	} else {
+		_ = r.ParseForm()
+	}
+}
+
 func requestLang(r *http.Request) string {
 	if lang := languageFromRequest(r); lang != "" {
 		return i18n.Normalize(lang)
 	}
-	if err := r.ParseForm(); err != nil {
-		return resolvedLanguage(r)
-	}
+	parseRequestForm(r)
 	if lang := r.FormValue("lang"); lang != "" {
 		return i18n.Normalize(lang)
 	}
@@ -317,10 +324,9 @@ func withError(path, lang string, err error) string {
 }
 
 func fallbackRedirect(r *http.Request, fallback string) string {
-	if err := r.ParseForm(); err == nil {
-		if redirectTo := r.FormValue("redirect_to"); redirectTo != "" {
-			return redirectTo
-		}
+	parseRequestForm(r)
+	if redirectTo := r.FormValue("redirect_to"); redirectTo != "" {
+		return redirectTo
 	}
 	return fallback
 }

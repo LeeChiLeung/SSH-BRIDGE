@@ -53,7 +53,7 @@ func renderFormModal(data viewmodel.FormPageData) string {
     </div>
     <a class="link" href="%s" aria-label="%s">X</a>
   </div>
-  <form class="modal-body" action="%s" method="post">
+  <form class="modal-body" action="%s" method="post" enctype="multipart/form-data">
     <input type="hidden" name="id" value="%s">
     <input type="hidden" name="lang" value="%s">
     <input type="hidden" name="redirect_to" value="%s">
@@ -102,6 +102,7 @@ func formFields(data viewmodel.FormPageData, t i18n.Translator) string {
 <div class="field"><label>%s</label><input name="ssh_host" value="%s"></div>
 <div class="field"><label>%s</label><input name="ssh_port" value="%d"></div>
 <div class="field"><label>%s</label><input type="password" name="ssh_password" value="%s"></div>
+<div class="field"><label>%s</label><input type="file" name="ssh_key_file" accept=".pem,.key,id_rsa,id_ed25519"></div>
 <div class="field"><label>%s</label><input name="ssh_key_path" value="%s" placeholder="%s"></div>
 <div class="field"><label>%s</label><input name="local_addr" value="%s"></div>
 <div class="field"><label>%s</label><input name="local_port" value="%d"></div>
@@ -114,6 +115,7 @@ func formFields(data viewmodel.FormPageData, t i18n.Translator) string {
 		template.HTMLEscapeString(t.T("field.ssh_host")), template.HTMLEscapeString(data.SSHHost),
 		template.HTMLEscapeString(t.T("field.ssh_port")), data.SSHPort,
 		template.HTMLEscapeString(t.T("field.ssh_password")), template.HTMLEscapeString(data.SSHPassword),
+		template.HTMLEscapeString(t.T("field.ssh_key_upload")),
 		template.HTMLEscapeString(t.T("field.ssh_key")), template.HTMLEscapeString(data.SSHKeyPath), template.HTMLEscapeString(t.T("placeholder.key")),
 		template.HTMLEscapeString(t.T("field.local_addr")), template.HTMLEscapeString(data.LocalAddr),
 		template.HTMLEscapeString(t.T("field.local_port")), data.LocalPort,
