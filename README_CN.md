@@ -71,7 +71,7 @@ go run . --web-new
 默认访问地址：
 
 ```text
-http://127.0.0.1:8848
+http://127.0.0.1:8765
 ```
 
 启动托盘模式：
@@ -82,8 +82,8 @@ go run . --tray
 
 托盘模式会同时启动：
 
-- 旧控制台：`http://127.0.0.1:8848`
-- 新控制台：`http://127.0.0.1:8849`
+- 旧控制台：`http://127.0.0.1:8765`
+- 新控制台：`http://127.0.0.1:8910`
 
 托盘菜单中的“打开控制台”当前会打开新的控制台页面。
 
@@ -127,13 +127,13 @@ export TUNNEL_LOCAL_PORT=43017
 ### 3. 旧版 Web 控制台模式
 
 ```bash
-go run . --web --web-addr 127.0.0.1:8848
+go run . --web --web-addr 127.0.0.1:8765
 ```
 
 ### 4. 新版 Web 控制台模式
 
 ```bash
-go run . --web-new --web-addr 127.0.0.1:8848
+go run . --web-new --web-addr 127.0.0.1:8765
 ```
 
 新版 WebUI 当前提供：
@@ -151,7 +151,7 @@ go run . --web-new --web-addr 127.0.0.1:8848
 ### 5. 托盘模式
 
 ```bash
-go run . --tray --web-addr 127.0.0.1:8848
+go run . --tray --web-addr 127.0.0.1:8765
 ```
 
 当前托盘菜单：
@@ -299,7 +299,7 @@ VERSION=0.0.2 ./scripts/release.sh all
 AppImage 直接启动时默认进入：
 
 - `--tray`
-- `--web-addr 127.0.0.1:8848`
+- `--web-addr 127.0.0.1:8765`
 
 当前打包脚本已强制使用 `xz` 压缩的 squashfs，以兼容较旧的 AppImage runtime。
 

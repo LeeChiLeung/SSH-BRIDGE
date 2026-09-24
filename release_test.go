@@ -81,8 +81,8 @@ func TestReleaseAppImageProducesArtifact(t *testing.T) {
 	assertFileExists(t, filepath.Join(distDir, "timber-ssh-go_"+version+"_linux_amd64.AppImage"))
 	assertFileExists(t, filepath.Join(distDir, ".work", "appimage-amd64", "AppDir", "usr", "bin", "timber-ssh-go"))
 	appRun := mustReadFile(t, filepath.Join(distDir, ".work", "appimage-amd64", "AppDir", "AppRun"))
-	if !strings.Contains(appRun, "--tray --web-addr 127.0.0.1:8848") {
-		t.Fatalf("AppRun does not default to tray mode on port 8848:\n%s", appRun)
+	if !strings.Contains(appRun, "--tray --web-addr 127.0.0.1:8765") {
+		t.Fatalf("AppRun does not default to tray mode on port 8765:\n%s", appRun)
 	}
 
 	if _, err := os.Stat(filepath.Join(distDir, ".work", "appimage-amd64", "AppDir", "profiles.json")); !os.IsNotExist(err) {

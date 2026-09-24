@@ -73,7 +73,7 @@ go run . --web-new
 
 ```
 
-Default access URL: `[http://127.0.0.1:8848](http://127.0.0.1:8848)`
+Default access URL: `[http://127.0.0.1:8765](http://127.0.0.1:8765)`
 
 ### Start in Tray Mode:
 
@@ -84,8 +84,8 @@ go run . --tray
 
 Tray mode concurrently starts:
 
-* Legacy Console: `[http://127.0.0.1:8848](http://127.0.0.1:8848)`
-* Modern Console: `[http://127.0.0.1:8849](http://127.0.0.1:8849)`
+* Legacy Console: `[http://127.0.0.1:8765](http://127.0.0.1:8765)`
+* Modern Console: `[http://127.0.0.1:8910](http://127.0.0.1:8910)`
 
 *Note: The "Open Console" option in the tray menu currently opens the Modern Console.*
 
@@ -126,8 +126,8 @@ The program will output something like: `export TUNNEL_LOCAL_PORT=43017`.
 
 ### 3. Web Console Modes
 
-* **Legacy**: `go run . --web --web-addr 127.0.0.1:8848`
-* **Modern**: `go run . --web-new --web-addr 127.0.0.1:8848`
+* **Legacy**: `go run . --web --web-addr 127.0.0.1:8765`
+* **Modern**: `go run . --web-new --web-addr 127.0.0.1:8765`
 
 **Modern WebUI Features:**
 
@@ -142,7 +142,7 @@ The program will output something like: `export TUNNEL_LOCAL_PORT=43017`.
 ### 4. Tray Mode
 
 ```bash
-go run . --tray --web-addr 127.0.0.1:8848
+go run . --tray --web-addr 127.0.0.1:8765
 
 ```
 

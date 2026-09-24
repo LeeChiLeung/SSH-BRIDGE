@@ -64,17 +64,17 @@ func TestManagedRuntimeCanBeSharedAcrossWebModes(t *testing.T) {
 }
 
 func TestNextWebAddrUsesAdjacentPort(t *testing.T) {
-	got, err := nextWebAddr("127.0.0.1:8848")
+	got, err := nextWebAddr("127.0.0.1:18848")
 	if err != nil {
 		t.Fatalf("nextWebAddr: %v", err)
 	}
-	if got != "127.0.0.1:8849" {
-		t.Fatalf("nextWebAddr = %q, want %q", got, "127.0.0.1:8849")
+	if got != "127.0.0.1:18849" {
+		t.Fatalf("nextWebAddr = %q, want %q", got, "127.0.0.1:18849")
 	}
 }
 
 func TestShouldDefaultToTrayForWindows(t *testing.T) {
-	opts := cliOptions{WebAddr: "127.0.0.1:8848"}
+	opts := cliOptions{WebAddr: "127.0.0.1:8765"}
 	if !shouldDefaultToTrayForOS("windows", opts) {
 		t.Fatal("expected windows no-arg launch to default to tray mode")
 	}
@@ -84,12 +84,12 @@ func TestShouldDefaultToTrayForWindows(t *testing.T) {
 }
 
 func TestShouldDefaultToTraySkipsExplicitModes(t *testing.T) {
-	opts := cliOptions{TrayMode: true, WebAddr: "127.0.0.1:8848"}
+	opts := cliOptions{TrayMode: true, WebAddr: "127.0.0.1:8765"}
 	if shouldDefaultToTrayForOS("windows", opts) {
 		t.Fatal("did not expect explicit tray mode to trigger implicit tray default")
 	}
 
-	opts = cliOptions{WebNewMode: true, WebAddr: "127.0.0.1:8848"}
+	opts = cliOptions{WebNewMode: true, WebAddr: "127.0.0.1:8765"}
 	if shouldDefaultToTrayForOS("windows", opts) {
 		t.Fatal("did not expect explicit web-new mode to trigger implicit tray default")
 	}

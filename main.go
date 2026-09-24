@@ -212,9 +212,12 @@ func runTrayMode(opts cliOptions, logger *log.Logger) error {
 		return err
 	}
 	legacy := &managedWebMode{server: legacyServer, webAddr: opts.WebAddr}
-	newAddr, err := nextWebAddr(opts.WebAddr)
-	if err != nil {
-		return err
+	newAddr := defaultNewWebAddr
+	if opts.WebAddr != defaultWebAddr {
+		newAddr, err = nextWebAddr(opts.WebAddr)
+		if err != nil {
+			return err
+		}
 	}
 	modern := &managedWebMode{
 		server:  NewTemplWebServer(newAddr, newUIRouter(runtime.controller, runtime.store, "")),

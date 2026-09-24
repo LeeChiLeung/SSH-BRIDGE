@@ -22,7 +22,8 @@ const (
 	defaultRemotePort = 5432
 	defaultLocalAddr  = "127.0.0.1"
 	defaultLocalPort  = 15432
-	defaultWebAddr    = "127.0.0.1:8848"
+	defaultWebAddr    = "127.0.0.1:8765"
+	defaultNewWebAddr = "127.0.0.1:8910"
 	defaultTitle      = "示例隧道"
 )
 

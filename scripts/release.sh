@@ -244,7 +244,7 @@ cat >"$appdir/AppRun" <<EOF
 set -euo pipefail
 HERE="\$(cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
 if [[ "\$#" -eq 0 ]]; then
-  exec "\$HERE/usr/bin/$APP_NAME" --tray --web-addr 127.0.0.1:8848
+  exec "\$HERE/usr/bin/$APP_NAME" --tray --web-addr 127.0.0.1:8765
 fi
 exec "\$HERE/usr/bin/$APP_NAME" "\$@"
 EOF

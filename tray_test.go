@@ -19,7 +19,7 @@ func TestTrayAppMenuAndOpenAction(t *testing.T) {
 		manager:   manager,
 		opener:    opener,
 		logger:    log.New(io.Discard, "", 0),
-		newWebURL: "http://127.0.0.1:8849",
+		newWebURL: "http://127.0.0.1:8910",
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -50,7 +50,7 @@ func TestTrayAppNewConsoleAction(t *testing.T) {
 		manager:   manager,
 		opener:    opener,
 		logger:    log.New(io.Discard, "", 0),
-		newWebURL: "http://127.0.0.1:8849",
+		newWebURL: "http://127.0.0.1:8910",
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -64,7 +64,7 @@ func TestTrayAppNewConsoleAction(t *testing.T) {
 	manager.waitReady(t)
 	manager.click(trayOpenNewConsole)
 	waitForCondition(t, func() bool {
-		return opener.lastURL() == "http://127.0.0.1:8849"
+		return opener.lastURL() == "http://127.0.0.1:8910"
 	})
 
 	cancel()
@@ -82,7 +82,7 @@ func TestTrayAppQuitActionTriggersShutdown(t *testing.T) {
 		manager:   manager,
 		opener:    &fakeBrowserOpener{},
 		logger:    log.New(io.Discard, "", 0),
-		newWebURL: "http://127.0.0.1:8849",
+		newWebURL: "http://127.0.0.1:8910",
 		onQuit: func() {
 			quitCalled <- struct{}{}
 		},
@@ -120,7 +120,7 @@ func TestTrayAppOpenFailureKeepsTrayAlive(t *testing.T) {
 		manager:   manager,
 		opener:    failingBrowserOpener{},
 		logger:    log.New(io.Discard, "", 0),
-		newWebURL: "http://127.0.0.1:8849",
+		newWebURL: "http://127.0.0.1:8910",
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
